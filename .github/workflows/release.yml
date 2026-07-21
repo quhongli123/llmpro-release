@@ -79,6 +79,16 @@ jobs:
         working-directory: source
         run: pnpm install --frozen-lockfile
 
+      # 从 release_tag 自动生成版本覆盖（无需改源码里的 tauri.conf.json）
+      - name: Prepare version override from tag
+        working-directory: source
+        run: |
+          VER="${{ github.event.inputs.release_tag }}"
+          VER="${VER#v}"
+          printf '{"version":"%s"}\n' "$VER" > version-override.json
+          echo "version override -> $VER"
+          cat version-override.json
+
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
       - name: Build & publish signed release
         uses: tauri-apps/tauri-action@v0
@@ -93,4 +103,4 @@ jobs:
           releaseBody: '应用内会自动检测并提示更新。'
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
