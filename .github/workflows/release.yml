@@ -82,12 +82,10 @@ jobs:
       # 从 release_tag 自动生成版本覆盖（无需改源码里的 tauri.conf.json）
       - name: Prepare version override from tag
         working-directory: source
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
-          VER="${{ github.event.inputs.release_tag }}"
-          VER="${VER#v}"
-          printf '{"version":"%s"}\n' "$VER" > version-override.json
-          echo "version override -> $VER"
-          cat version-override.json
+          node -e 'const fs=require("node:fs"); const tag=process.env.RELEASE_TAG || ""; const version=tag.replace(/^v/, ""); if (!/^\d+\.\d+\.\d+$/.test(version)) { console.error(`invalid release tag: ${tag}`); process.exit(1); } fs.writeFileSync("version-override.json", JSON.stringify({version}) + "\n"); console.log("version override -> " + version); console.log(fs.readFileSync("version-override.json", "utf8"));'
 
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
       - name: Build & publish signed release
