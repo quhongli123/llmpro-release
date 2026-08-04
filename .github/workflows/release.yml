@@ -22,6 +22,10 @@ on:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: llmpro-release-publication
   cancel-in-progress: false
