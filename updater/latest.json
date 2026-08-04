@@ -1,0 +1,39 @@
+{
+  "version": "0.2.12",
+  "notes": "应用内会自动检测并提示更新。",
+  "pub_date": "2026-08-04T02:28:42.643Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTFkQkEvTGZXbzZJRmxqYmFPRDZkdTRzYWlpWTRIdG85aE5LeENTRkhlU2dSaEVDSGtGVHhIWVh6MGtiNGtVcDNVL0VvSDk0Q28xKytDYUlOaUVrTndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNDE3CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKRVJwMkZqeEw4QU5Xei9raUV0SE1qV0JUUkJJdnMvak9LU2ZuNnNWQXNhd3pOVnAxM1MwZnI3NG1BaUlNek9JSmxja2wvbnRFYll5OFc5Wk5raGx2RHc9PQo=",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_aarch64.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTFkQkEvTGZXbzZJRmxqYmFPRDZkdTRzYWlpWTRIdG85aE5LeENTRkhlU2dSaEVDSGtGVHhIWVh6MGtiNGtVcDNVL0VvSDk0Q28xKytDYUlOaUVrTndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNDE3CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKRVJwMkZqeEw4QU5Xei9raUV0SE1qV0JUUkJJdnMvak9LU2ZuNnNWQXNhd3pOVnAxM1MwZnI3NG1BaUlNek9JSmxja2wvbnRFYll5OFc5Wk5raGx2RHc9PQo=",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_aarch64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZS9EdEh3UEptYjM1U2UvTmhqLzhKUlJWdERhb3N3Y2ZTbmtRSHF4eDE3MGNFTys5dEEzb25hd3hsY3pVQ2F1SDJ1Y1pjM3hncmlsSmJrcDg1RlJKSUFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNTAxCWZpbGU6bGxtcHJvXzAuMi4xMl94NjRfZW4tVVMubXNpCktydEFGVXVoZHBCWHdyYUo4cXBzSFlpS1lIVzh6dHJhYjFsWHpnUTBOR0J5YVlDbXdXakRtZ0RVK1lGTFU4eHl2K0MramFGMkNTZmlSWFJ5bCtTQ0NnPT0K",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_0.2.12_x64_en-US.msi"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZS9EdEh3UEptYjM1U2UvTmhqLzhKUlJWdERhb3N3Y2ZTbmtRSHF4eDE3MGNFTys5dEEzb25hd3hsY3pVQ2F1SDJ1Y1pjM3hncmlsSmJrcDg1RlJKSUFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNTAxCWZpbGU6bGxtcHJvXzAuMi4xMl94NjRfZW4tVVMubXNpCktydEFGVXVoZHBCWHdyYUo4cXBzSFlpS1lIVzh6dHJhYjFsWHpnUTBOR0J5YVlDbXdXakRtZ0RVK1lGTFU4eHl2K0MramFGMkNTZmlSWFJ5bCtTQ0NnPT0K",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_0.2.12_x64_en-US.msi"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTNYNm4yVUtVZzBWd0tFcHpGbGIwRW4vUUFjd1IrcE1sYVRKT0dwWEtJOEdha3dJcWs0RUtGN0ZsUXA4NFRmY0svMUtrczNKNnUyMFpmcmsvSlJiZFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNTAxCWZpbGU6bGxtcHJvXzAuMi4xMl94NjQtc2V0dXAuZXhlClRJdU5KUnVrR2wzckN3S3kzV3BaUVI1cDd5NTdUdUxwSEZ6RkZtaklPTUtmWG11am1kYVFzMUJWa0wrbXpHeVl2amdtODJ4Zk1FWFlhQ0RYeWRuSURnPT0K",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_0.2.12_x64-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXpFS3FmczVvTWZhZURPbi9GTU9HVXZ3Mkw3RjFiajFNRFQ1OEVuNDdyNjByb09RZ0JVK1B5VTJEQmhvanZzSlcxenpPNmQ1UXBRV0Mzcy9CUnlONHdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNTE4CWZpbGU6bGxtcHJvXzAuMi4xMl9hbWQ2NC5BcHBJbWFnZQpNeFJ6QWxTeWVnVlhwb0pwODVqdzVWM3ZtckRjNldvemQ3akl2d3FrK1hlamNWZTJFVjN0WStZbmx3VXVJNFE3Nm1BczdqL2NPN3FpR0lwTml1Sy9EQT09Cg==",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_0.2.12_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXpFS3FmczVvTWZhZURPbi9GTU9HVXZ3Mkw3RjFiajFNRFQ1OEVuNDdyNjByb09RZ0JVK1B5VTJEQmhvanZzSlcxenpPNmQ1UXBRV0Mzcy9CUnlONHdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNTE4CWZpbGU6bGxtcHJvXzAuMi4xMl9hbWQ2NC5BcHBJbWFnZQpNeFJ6QWxTeWVnVlhwb0pwODVqdzVWM3ZtckRjNldvemQ3akl2d3FrK1hlamNWZTJFVjN0WStZbmx3VXVJNFE3Nm1BczdqL2NPN3FpR0lwTml1Sy9EQT09Cg==",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_0.2.12_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTB6Z0JxdUtQcDZWT2FhYUZmNDRieXlhcmM3NWtKU0xpOXQ2cUlXaXRoZmdsS0NFRFEwQlB2dzJiN2hxakJMcmUwdjFHTFBHTlkrQndmUFhHNS9IVEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODEwNTE4CWZpbGU6bGxtcHJvXzAuMi4xMl9hbWQ2NC5kZWIKczhsUUp5Z3ZRcElUazhwcEFBdnNnV2drekJENU5kK0hoVVlmUnZicFl5OGs5NEpuM25LY29KNnlJVW5EY3o3QVZVZjJyTE9LTklhY044N1hQVmJsRGc9PQo=",
+      "url": "https://github.com/quhongli123/llmpro-release/releases/download/v0.2.12/llmpro_0.2.12_amd64.deb"
+    }
+  }
+}

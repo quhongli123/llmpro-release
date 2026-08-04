@@ -3,7 +3,8 @@ name: release
 # 这个 workflow 属于【公开发布仓 llmpro-release】。
 # 它在构建时临时拉取【私有源码仓 llmpro】的代码（源码不会进入本仓库），
 # 三平台编译签名安装包 + latest.json，发布到本仓库的 Releases。
-# 应用内自动更新读取的就是本仓库 releases/latest 的 latest.json。
+# 所有构建完成后，将最高语义版本的 latest.json 发布到 updater/latest.json。
+# 应用内自动更新只读取该固定地址，避免 GitHub releases/latest 按发布时间倒退。
 #
 # 手动发版：Actions -> release -> Run workflow，填写：
 #   source_ref  = 私有源码仓要构建的分支或 tag（默认 main）
@@ -21,6 +22,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: llmpro-release-publication
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -137,3 +142,90 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
+
+  publish-updater-manifest:
+    name: Publish stable updater manifest
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release repository
+        uses: actions/checkout@v4
+
+      - name: Download generated release manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p .updater-download
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.json \
+            --dir .updater-download
+
+      - name: Keep the highest semantic-version manifest
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const releaseTag = process.env.RELEASE_TAG ?? "";
+          const version = releaseTag.replace(/^v/, "");
+          if (!/^\d+\.\d+\.\d+$/.test(version)) {
+            throw new Error(`Invalid release tag: ${releaseTag}`);
+          }
+
+          const source = ".updater-download/latest.json";
+          const target = "updater/latest.json";
+          const next = JSON.parse(fs.readFileSync(source, "utf8"));
+          if (next.version !== version) {
+            throw new Error(`Manifest version ${next.version} does not match ${version}`);
+          }
+
+          for (const platform of ["darwin-aarch64", "windows-x86_64", "linux-x86_64"]) {
+            if (!next.platforms?.[platform]?.url || !next.platforms?.[platform]?.signature) {
+              throw new Error(`Generated manifest is missing ${platform}`);
+            }
+          }
+
+          const compare = (left, right) => {
+            const a = left.split(".").map(Number);
+            const b = right.split(".").map(Number);
+            for (let i = 0; i < 3; i += 1) {
+              if (a[i] !== b[i]) return a[i] - b[i];
+            }
+            return 0;
+          };
+
+          if (fs.existsSync(target)) {
+            const current = JSON.parse(fs.readFileSync(target, "utf8"));
+            if (!/^\d+\.\d+\.\d+$/.test(current.version ?? "")) {
+              throw new Error(`Invalid existing manifest version: ${current.version}`);
+            }
+            if (compare(version, current.version) < 0) {
+              console.log(`Keep current manifest ${current.version}; ${version} is older.`);
+              process.exit(0);
+            }
+          }
+
+          fs.mkdirSync("updater", { recursive: true });
+          fs.writeFileSync(target, `${JSON.stringify(next, null, 2)}\n`);
+          console.log(`Published stable updater manifest ${version}.`);
+          NODE
+
+      - name: Commit stable updater manifest
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- updater/latest.json; then
+            echo "Stable updater manifest is already newer or identical."
+            exit 0
+          fi
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add updater/latest.json
+          git commit -m "chore(updater): publish ${{ github.event.inputs.release_tag }}"
+          git push
