@@ -263,12 +263,16 @@ jobs:
           while IFS= read -r -d '' file; do
             name="$(basename "$file")"
             "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/$name" \
-              "obs://$OBS_BUCKET/llmpro/$version/$name" -f
+              "obs://$OBS_BUCKET/llmpro/$version/$name" \
+              -f \
+              -acl=public-read
           done < <(find "$GITHUB_WORKSPACE/.obs-upload" -maxdepth 1 -type f -print0)
 
           "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/latest.json" \
             "obs://$OBS_BUCKET/llmpro/latest.json" \
-            -f -meta=Content-Type:application/json
+            -f \
+            -acl=public-read \
+            -meta=Content-Type:application/json
 
       - name: Replace GitHub bridge manifest with OBS URLs
         env:
