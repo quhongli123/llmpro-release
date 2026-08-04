@@ -14,15 +14,12 @@ llmpro 桌面客户端 —— 一键把 Claude Code / Codex 指向 llm-center �
 
 ## macOS 发布要求
 
-macOS 安装包必须使用 Developer ID Application 证书签名，并通过 Apple notarization 后再发布。
+macOS 安装包使用 Developer ID Application 证书签名后发布。当前 GitHub Actions 不以 Apple notarization 作为发布阻断条件；新用户首次打开 macOS 安装包时，系统可能要求右键选择“打开”。
 公开仓库的 Actions secrets 需要配置：
 
 - `APPLE_CERTIFICATE`：Developer ID Application `.p12` 文件的 base64 内容
 - `APPLE_CERTIFICATE_PASSWORD`：`.p12` 导出密码
 - `APPLE_SIGNING_IDENTITY`：证书完整名称，例如 `Developer ID Application: Your Name (TEAMID)`
-- `APPLE_ID`：Apple Developer 账号邮箱
-- `APPLE_PASSWORD`：该 Apple ID 的 app-specific password，不是 Apple ID 登录密码
-- `APPLE_TEAM_ID`：Apple Developer Team ID
 
 缺少任意一项时，macOS 发布任务会直接失败，不会生成未签名的可下载 DMG。
 
