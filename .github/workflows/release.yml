@@ -2,9 +2,8 @@ name: release
 
 # 这个 workflow 属于【公开发布仓 llmpro-release】。
 # 它在构建时临时拉取【私有源码仓 llmpro】的代码（源码不会进入本仓库），
-# 三平台编译签名安装包 + latest.json，发布到本仓库的 Releases。
-# 所有构建完成后，将最高语义版本的 latest.json 发布到 updater/latest.json。
-# 应用内自动更新只读取该固定地址，避免 GitHub releases/latest 按发布时间倒退。
+# 三平台编译签名安装包，上传到 Huawei Cloud OBS，并同步一个 GitHub
+# bridge latest.json，兼容已经安装的旧版本。
 #
 # 手动发版：Actions -> release -> Run workflow，填写：
 #   source_ref  = 私有源码仓要构建的分支或 tag（默认 main）
@@ -28,7 +27,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-obs-config:
+    name: Verify OBS release configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check OBS variables and secrets
+        env:
+          OBS_ACCESS_KEY: ${{ secrets.OBS_ACCESS_KEY }}
+          OBS_SECRET_KEY: ${{ secrets.OBS_SECRET_KEY }}
+          OBS_BUCKET: ${{ vars.OBS_BUCKET }}
+          OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
+          OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            OBS_ACCESS_KEY \
+            OBS_SECRET_KEY \
+            OBS_BUCKET \
+            OBS_ENDPOINT \
+            OBS_PUBLIC_BASE_URL
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing OBS release setting::$name is required"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
   release:
+    needs: verify-obs-config
     strategy:
       fail-fast: false
       matrix:
@@ -89,8 +119,32 @@ jobs:
         working-directory: source
         env:
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
         run: |
-          node -e 'const fs=require("node:fs"); const tag=process.env.RELEASE_TAG || ""; const version=tag.replace(/^v/, ""); if (!/^\d+\.\d+\.\d+$/.test(version)) { console.error(`invalid release tag: ${tag}`); process.exit(1); } fs.writeFileSync("version-override.json", JSON.stringify({version}) + "\n"); console.log("version override -> " + version); console.log(fs.readFileSync("version-override.json", "utf8"));'
+          node <<'NODE'
+          const fs = require('node:fs');
+          const tag = process.env.RELEASE_TAG || '';
+          const version = tag.replace(/^v/, '');
+          const base = (process.env.OBS_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+          if (!/^\d+\.\d+\.\d+$/.test(version)) {
+            console.error(`invalid release tag: ${tag}`);
+            process.exit(1);
+          }
+          if (!base) {
+            console.error('OBS_PUBLIC_BASE_URL is required');
+            process.exit(1);
+          }
+          const config = {
+            version,
+            plugins: {
+              updater: {
+                endpoints: [`${base}/llmpro/latest.json`],
+              },
+            },
+          };
+          fs.writeFileSync('version-override.json', `${JSON.stringify(config)}\n`);
+          console.log(`version and updater endpoint override -> ${version}, ${base}/llmpro/latest.json`);
+          NODE
 
       - name: Verify macOS signing and notarization secrets
         if: matrix.platform == 'macos-latest'
@@ -143,8 +197,8 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
 
-  publish-updater-manifest:
-    name: Publish stable updater manifest
+  publish-obs:
+    name: Publish OBS artifacts and bridge manifest
     needs: release
     runs-on: ubuntu-latest
 
@@ -152,80 +206,91 @@ jobs:
       - name: Checkout release repository
         uses: actions/checkout@v4
 
-      - name: Download generated release manifest
+      - name: Download all generated release assets
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
-          mkdir -p .updater-download
+          mkdir -p .release-assets
           gh release download "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern latest.json \
-            --dir .updater-download
+            --pattern '*' \
+            --dir .release-assets
 
-      - name: Keep the highest semantic-version manifest
+      - name: Prepare OBS manifest and upload directory
         env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_ASSET_DIR: .release-assets
+          OBS_UPLOAD_DIR: .obs-upload
+          OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
+          STABLE_MANIFEST_PATH: updater/latest.json
+        run: node scripts/publish-obs-manifest.mjs
+
+      - name: Install obsutil
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/obsutil"
+          curl -fsSL \
+            'https://obs-community-intl.obs.ap-southeast-1.myhuaweicloud.com/obsutil/current/obsutil_linux_amd64.tar.gz' \
+            | tar -xz -C "$RUNNER_TEMP/obsutil"
+          OBSUTIL="$(find "$RUNNER_TEMP/obsutil" -type f -name obsutil | head -1)"
+          if [ -z "$OBSUTIL" ]; then
+            echo "::error::obsutil binary was not found"
+            exit 1
+          fi
+          chmod 755 "$OBSUTIL"
+          echo "OBSUTIL=$OBSUTIL" >> "$GITHUB_ENV"
+
+      - name: Upload versioned assets to OBS
+        env:
+          OBS_ACCESS_KEY: ${{ secrets.OBS_ACCESS_KEY }}
+          OBS_SECRET_KEY: ${{ secrets.OBS_SECRET_KEY }}
+          OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
+          OBS_BUCKET: ${{ vars.OBS_BUCKET }}
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
-          node <<'NODE'
-          const fs = require("node:fs");
+          version="${RELEASE_TAG#v}"
+          config_dir="$RUNNER_TEMP/obs-config"
+          mkdir -p "$config_dir"
+          cd "$config_dir"
+          "$OBSUTIL" config \
+            -i="$OBS_ACCESS_KEY" \
+            -k="$OBS_SECRET_KEY" \
+            -e="$OBS_ENDPOINT"
 
-          const releaseTag = process.env.RELEASE_TAG ?? "";
-          const version = releaseTag.replace(/^v/, "");
-          if (!/^\d+\.\d+\.\d+$/.test(version)) {
-            throw new Error(`Invalid release tag: ${releaseTag}`);
-          }
+          while IFS= read -r -d '' file; do
+            name="$(basename "$file")"
+            "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/$name" \
+              "obs://$OBS_BUCKET/llmpro/$version/$name" -f
+          done < <(find "$GITHUB_WORKSPACE/.obs-upload" -maxdepth 1 -type f -print0)
 
-          const source = ".updater-download/latest.json";
-          const target = "updater/latest.json";
-          const next = JSON.parse(fs.readFileSync(source, "utf8"));
-          if (next.version !== version) {
-            throw new Error(`Manifest version ${next.version} does not match ${version}`);
-          }
+          "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/latest.json" \
+            "obs://$OBS_BUCKET/llmpro/latest.json" \
+            -f -meta=Content-Type:application/json
 
-          for (const platform of ["darwin-aarch64", "windows-x86_64", "linux-x86_64"]) {
-            if (!next.platforms?.[platform]?.url || !next.platforms?.[platform]?.signature) {
-              throw new Error(`Generated manifest is missing ${platform}`);
-            }
-          }
+      - name: Replace GitHub bridge manifest with OBS URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            .obs-upload/latest.json \
+            --clobber
 
-          const compare = (left, right) => {
-            const a = left.split(".").map(Number);
-            const b = right.split(".").map(Number);
-            for (let i = 0; i < 3; i += 1) {
-              if (a[i] !== b[i]) return a[i] - b[i];
-            }
-            return 0;
-          };
-
-          if (fs.existsSync(target)) {
-            const current = JSON.parse(fs.readFileSync(target, "utf8"));
-            if (!/^\d+\.\d+\.\d+$/.test(current.version ?? "")) {
-              throw new Error(`Invalid existing manifest version: ${current.version}`);
-            }
-            if (compare(version, current.version) < 0) {
-              console.log(`Keep current manifest ${current.version}; ${version} is older.`);
-              process.exit(0);
-            }
-          }
-
-          fs.mkdirSync("updater", { recursive: true });
-          fs.writeFileSync(target, `${JSON.stringify(next, null, 2)}\n`);
-          console.log(`Published stable updater manifest ${version}.`);
-          NODE
-
-      - name: Commit stable updater manifest
+      - name: Commit bridge manifest
         run: |
           set -euo pipefail
           if git diff --quiet -- updater/latest.json; then
-            echo "Stable updater manifest is already newer or identical."
+            echo "Bridge manifest is already newer or identical."
             exit 0
           fi
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add updater/latest.json
-          git commit -m "chore(updater): publish ${{ github.event.inputs.release_tag }}"
+          git commit -m "chore(updater): bridge ${{ github.event.inputs.release_tag }} to OBS"
           git push

@@ -4,7 +4,7 @@ llmpro 桌面客户端 —— 一键把 Claude Code / Codex 指向 llm-center �
 
 ## 下载安装
 
-前往 [**Releases**](https://github.com/quhongli123/llmpro-release/releases/latest) 下载对应平台的安装包：
+安装包和自动更新文件发布到 OBS；GitHub Release 只保留兼容旧版本的桥接清单。
 
 | 平台 | 文件 |
 |------|------|
@@ -25,6 +25,30 @@ macOS 安装包必须使用 Developer ID Application 证书签名，并通过 Ap
 - `APPLE_TEAM_ID`：Apple Developer Team ID
 
 缺少任意一项时，macOS 发布任务会直接失败，不会生成未签名的可下载 DMG。
+
+## OBS 发布配置
+
+公开仓 `Actions` 使用以下配置上传到 Huawei Cloud OBS：
+
+Repository Variables：
+
+- `OBS_BUCKET`：OBS 桶名，例如 `assets-hub`
+- `OBS_ENDPOINT`：OBS 服务 endpoint
+- `OBS_PUBLIC_BASE_URL`：客户端可访问的公开下载地址，不填控制台地址
+
+Repository Secrets：
+
+- `OBS_ACCESS_KEY`：OBS AK
+- `OBS_SECRET_KEY`：OBS SK
+
+对象路径固定为：
+
+```text
+llmpro/<version>/*
+llmpro/latest.json
+```
+
+`latest.json` 和安装包会先上传到 OBS，再把 GitHub Release 中的 `latest.json` 替换为 OBS 地址。这样已经安装旧版本的用户仍能从 GitHub 获取一次桥接清单，之后更新直接走 OBS。
 
 ## 自动更新
 
