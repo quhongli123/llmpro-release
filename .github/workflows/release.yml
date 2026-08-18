@@ -61,8 +61,61 @@ jobs:
             exit 1
           fi
 
+  validate:
+    name: Validate source (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: quhongli123/llmpro
+          ref: ${{ github.event.inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: source
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './source/src-tauri -> target'
+
+      - name: Install JS deps
+        working-directory: source
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate source
+        working-directory: source
+        run: |
+          pnpm typecheck
+          pnpm test --run
+          pnpm build
+          cargo test --manifest-path src-tauri/Cargo.toml
+
   release:
-    needs: verify-obs-config
+    needs:
+      - verify-obs-config
+      - validate
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -116,13 +169,6 @@ jobs:
       - name: Install JS deps
         working-directory: source
         run: pnpm install --frozen-lockfile
-
-      - name: Validate source before packaging
-        working-directory: source
-        run: |
-          pnpm typecheck
-          pnpm test --run
-          cargo test claude_desktop_config --manifest-path src-tauri/Cargo.toml
 
       # 从 release_tag 自动生成版本覆盖（无需改源码里的 tauri.conf.json）
       - name: Prepare version override from tag
