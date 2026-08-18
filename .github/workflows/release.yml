@@ -65,6 +65,7 @@ jobs:
     needs: verify-obs-config
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - platform: macos-latest
