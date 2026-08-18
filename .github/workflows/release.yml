@@ -70,8 +70,6 @@ jobs:
         include:
           - platform: macos-latest
             args: '--bundles app,dmg'
-          - platform: ubuntu-22.04
-            args: '--bundles appimage,deb'
           - platform: windows-latest
             args: '--bundles nsis,msi'
     runs-on: ${{ matrix.platform }}
