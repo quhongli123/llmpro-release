@@ -117,6 +117,13 @@ jobs:
         working-directory: source
         run: pnpm install --frozen-lockfile
 
+      - name: Validate source before packaging
+        working-directory: source
+        run: |
+          pnpm typecheck
+          pnpm test --run
+          cargo test claude_desktop_config --manifest-path src-tauri/Cargo.toml
+
       # 从 release_tag 自动生成版本覆盖（无需改源码里的 tauri.conf.json）
       - name: Prepare version override from tag
         working-directory: source
