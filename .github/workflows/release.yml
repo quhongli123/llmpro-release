@@ -81,6 +81,15 @@ jobs:
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           path: source
 
+      - name: Install Linux system deps (WebKitGTK etc.)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl wget file patchelf libssl-dev \
+            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
+            libwebkit2gtk-4.1-dev libsoup-3.0-dev
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
