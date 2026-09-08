@@ -18,6 +18,10 @@ on:
       release_tag:
         description: '发布版本 tag，如 v0.2.0'
         required: true
+      platforms:
+        description: '构建平台：macos,windows,linux 的逗号分隔组合'
+        required: true
+        default: 'macos,windows,linux'
 
 permissions:
   contents: write
@@ -31,6 +35,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve-platforms:
+    name: Resolve build platforms
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - id: resolve
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const requested = (process.env.PLATFORMS || '')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+          const supported = {
+            macos: { name: 'macos', platform: 'macos-latest', args: '--bundles app,dmg' },
+            windows: { name: 'windows', platform: 'windows-latest', args: '--bundles nsis,msi' },
+            linux: { name: 'linux', platform: 'ubuntu-22.04', args: '--bundles appimage,deb' },
+          };
+          const invalid = requested.filter((name) => !supported[name]);
+          if (!requested.length || invalid.length) {
+            console.error(`Invalid platforms: ${invalid.join(', ') || '(empty)'}`);
+            process.exit(1);
+          }
+          const include = [...new Set(requested)].map((name) => supported[name]);
+          process.stdout.write(`matrix=${JSON.stringify({ include })}\n`);
+          NODE
+
   verify-obs-config:
     name: Verify OBS release configuration
     runs-on: ubuntu-latest
@@ -63,13 +96,10 @@ jobs:
 
   validate:
     name: Validate source (${{ matrix.platform }})
+    needs: resolve-platforms
     strategy:
       fail-fast: false
-      matrix:
-        platform:
-          - macos-latest
-          - windows-latest
-          - ubuntu-22.04
+      matrix: ${{ fromJSON(needs.resolve-platforms.outputs.matrix) }}
     runs-on: ${{ matrix.platform }}
 
     steps:
@@ -125,18 +155,12 @@ jobs:
   release:
     needs:
       - verify-obs-config
+      - resolve-platforms
       - validate
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
-        include:
-          - platform: macos-latest
-            args: '--bundles app,dmg'
-          - platform: windows-latest
-            args: '--bundles nsis,msi'
-          - platform: ubuntu-22.04
-            args: '--bundles appimage,deb'
+      matrix: ${{ fromJSON(needs.resolve-platforms.outputs.matrix) }}
     runs-on: ${{ matrix.platform }}
 
     steps:
