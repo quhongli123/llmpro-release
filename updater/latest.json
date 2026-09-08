@@ -1,27 +1,39 @@
 {
-  "version": "0.2.67",
+  "version": "0.2.68",
   "notes": "应用内会自动检测并提示更新。",
-  "pub_date": "2026-09-08T09:07:47.022Z",
+  "pub_date": "2026-09-08T12:17:38.370Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXp0ZWRzeE5vK01HSFNOL294Q0NIdWNBaVMzbS9PWXNSN1ExdDlSTlhDQmgwY2JoM3lFa2l6VUlnUThaS0tUYkVRMlBOdVNMMTREVWlOWElnMm1jakFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODU4MTM4CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKMmdkcXo1bzdRRDlIZzBUSUI0a2VrOHVRd0hKa3NhcEpQYzVoMFJjSWIvV2MwbmZjQUpBaTBTUytaMTVCTytScUE1Vi9LQnB4S2wvaVBWMDBuK3gwRHc9PQo=",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.67/llmpro_aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTRpV3N1ZEpTVzJzVngyRm1pdjdIelNxQWx6Vjltc00zSzJlWk13U0lyTkw2alo4M0h2U1ZkKzkzNU8wVWs4NmlJSmozK0xwQlVTNndNR2JJWk92ekFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5MzAyCWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKYW9kL2tyazJkb1VPN0lkUzN2RkhUMkgwZmxlR244RWp3d0JtOFM5T3dmOU43VWRWTTZ5T3dUeXl5N0FyZXgvaVpuSjA2a1h1V1RaNzBZeTFuZGV1QWc9PQo=",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_aarch64.app.tar.gz"
     },
     "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXp0ZWRzeE5vK01HSFNOL294Q0NIdWNBaVMzbS9PWXNSN1ExdDlSTlhDQmgwY2JoM3lFa2l6VUlnUThaS0tUYkVRMlBOdVNMMTREVWlOWElnMm1jakFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODU4MTM4CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKMmdkcXo1bzdRRDlIZzBUSUI0a2VrOHVRd0hKa3NhcEpQYzVoMFJjSWIvV2MwbmZjQUpBaTBTUytaMTVCTytScUE1Vi9LQnB4S2wvaVBWMDBuK3gwRHc9PQo=",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.67/llmpro_aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTRpV3N1ZEpTVzJzVngyRm1pdjdIelNxQWx6Vjltc00zSzJlWk13U0lyTkw2alo4M0h2U1ZkKzkzNU8wVWs4NmlJSmozK0xwQlVTNndNR2JJWk92ekFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5MzAyCWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKYW9kL2tyazJkb1VPN0lkUzN2RkhUMkgwZmxlR244RWp3d0JtOFM5T3dmOU43VWRWTTZ5T3dUeXl5N0FyZXgvaVpuSjA2a1h1V1RaNzBZeTFuZGV1QWc9PQo=",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_aarch64.app.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTd1WndTK3JUOEpxOHVZTDYwdVFtZlByckZ5WnRxZWQrVDVkVERlVGNWQkl0MEYzU3VISm9yWmdrZVBrUEpua2laQXlOQU9GREo1dHFCc05TSWlDdkFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODU4NDYyCWZpbGU6bGxtcHJvXzAuMi42N194NjRfZW4tVVMubXNpCktsQWc0TElROWY4Qk1KbE0zNnVtWHd0Q3k2dUc5S1U3RmdsMkluMVU5empWa0lrUjdZakt2eHB0ZkF1eE4rQXNKc3VTSmJSQWYrWkdYcGV5TWM1ZkNRPT0K",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.67/llmpro_0.2.67_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZS9td3liT3NiemxxNkNLSW96R3ZwcTVCZ3VlN05XR2NsaGV3cUsvY0NWQmRsU05lSUpabWh0WmUzTFZLSHc0OUxvUVVZbzZmS0VLbFEwNHFsUjNkamdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5NTg2CWZpbGU6bGxtcHJvXzAuMi42OF94NjRfZW4tVVMubXNpCktsSm1Zam1HbmszbGliUXdlYktuTDFQNmlmdmN6WXcvMGk2d0hYYnN3bTFVQXJ1VXVFZFQyeUVSZERiWEc1OUgrOVhWVW5EcHIyRFh1U0M4U1JwRkFnPT0K",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_0.2.68_x64_en-US.msi"
     },
     "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTd1WndTK3JUOEpxOHVZTDYwdVFtZlByckZ5WnRxZWQrVDVkVERlVGNWQkl0MEYzU3VISm9yWmdrZVBrUEpua2laQXlOQU9GREo1dHFCc05TSWlDdkFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODU4NDYyCWZpbGU6bGxtcHJvXzAuMi42N194NjRfZW4tVVMubXNpCktsQWc0TElROWY4Qk1KbE0zNnVtWHd0Q3k2dUc5S1U3RmdsMkluMVU5empWa0lrUjdZakt2eHB0ZkF1eE4rQXNKc3VTSmJSQWYrWkdYcGV5TWM1ZkNRPT0K",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.67/llmpro_0.2.67_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZS9td3liT3NiemxxNkNLSW96R3ZwcTVCZ3VlN05XR2NsaGV3cUsvY0NWQmRsU05lSUpabWh0WmUzTFZLSHc0OUxvUVVZbzZmS0VLbFEwNHFsUjNkamdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5NTg2CWZpbGU6bGxtcHJvXzAuMi42OF94NjRfZW4tVVMubXNpCktsSm1Zam1HbmszbGliUXdlYktuTDFQNmlmdmN6WXcvMGk2d0hYYnN3bTFVQXJ1VXVFZFQyeUVSZERiWEc1OUgrOVhWVW5EcHIyRFh1U0M4U1JwRkFnPT0K",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_0.2.68_x64_en-US.msi"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTdLclhhMGFCQVdqWFZUSmJBeUJqVEM3OUdlNUdSbEZnQ25pY0h0VndQVjVjb29KVUdWTVl6YzZPSklrbEhaSXZ3M2ZWencySkQwSDNFNzFMY0o4YUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODU4NDYyCWZpbGU6bGxtcHJvXzAuMi42N194NjQtc2V0dXAuZXhlCk91R2R4UzRpbkZwblRhaFhCSDY5NEJPV2NWUDRwUy9LbGVhUW9kNTNTaDVicnJ2QTVJNlVocElsSGdSZUZBVTlSRW5KeHM1YWxXZFFPZm1ZTkhZT0R3PT0K",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.67/llmpro_0.2.67_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXhJVWw0SWNYcW5CdzNjb3lNUGF5MHRWUEwxMUxRbmlFaTcwc2JRRXRGYXBCeDRKeFdBTElKVlh2TTJuNi92TUpSYzZpcThlemx1K2pqUE9lWk9JRkFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5NTg2CWZpbGU6bGxtcHJvXzAuMi42OF94NjQtc2V0dXAuZXhlCjJkSGJVS0tsUkREVmlHK0ZXaXUxaUU4anB5VjRZdEJNYi9acjA5Y2NjUUE5b3p4V1o1S1N3aWxrcS8zSDhzRnZLRUpJTlQvdW01ZjNBRlFBUWxmUEFnPT0K",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_0.2.68_x64-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZSs0TVVjT3ZQZnc0RU1uVVZtNHJIcDBuZHhvdDMwZWRkaGl2YkJYeHNVRU9ZUStQWUtKOTBtdWVBcDY5QVIzMnlVaHVtb3lpWWM3WHFvaUtHZXBvaVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5ODUzCWZpbGU6bGxtcHJvXzAuMi42OF9hbWQ2NC5BcHBJbWFnZQpXb3RzS0JZZUt4dURkS3ZHMDBGcTd1UW93bjQyclYvK0owN0F0L0dXbTdLdVVoNlNJZSt5emxJVzIxMjZEV1ltT1crRUxwTElEYnVDNVJDdzl1c0pBdz09Cg==",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_0.2.68_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZSs0TVVjT3ZQZnc0RU1uVVZtNHJIcDBuZHhvdDMwZWRkaGl2YkJYeHNVRU9ZUStQWUtKOTBtdWVBcDY5QVIzMnlVaHVtb3lpWWM3WHFvaUtHZXBvaVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5ODUzCWZpbGU6bGxtcHJvXzAuMi42OF9hbWQ2NC5BcHBJbWFnZQpXb3RzS0JZZUt4dURkS3ZHMDBGcTd1UW93bjQyclYvK0owN0F0L0dXbTdLdVVoNlNJZSt5emxJVzIxMjZEV1ltT1crRUxwTElEYnVDNVJDdzl1c0pBdz09Cg==",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_0.2.68_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZS9VS1RDMFFyWmhSaFMvV3VGVHRGTXlWT20wVmg4VEJDWUptd2lHL3Q5dURmMnc4Rnl2aGJMQ1ltd3V3KzRlVzYwanhiTlluUTlkK1hLTHZFdllYQWdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4ODY5ODUzCWZpbGU6bGxtcHJvXzAuMi42OF9hbWQ2NC5kZWIKUGpGTXpGNG5hbXlwWm1RK2o4c2ppVUlTc3NOV3lOSS9QcUpRMFk3RFh4VDYvZDNZK2hUZW5OWkxHU3BjRnFjNWRjY3plbWowZC9uR3UrOXBtQ01VRGc9PQo=",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.68/llmpro_0.2.68_amd64.deb"
     }
   }
 }
