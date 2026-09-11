@@ -76,7 +76,7 @@ jobs:
           trap 'rm -rf "$stage"' EXIT
           install -m 755 src-tauri/target/release/llmpro-cli "$stage/llmpro"
           tar -C "$stage" -czf "$RUNNER_TEMP/$archive" llmpro
-          shasum -a 256 "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
+          (cd "$RUNNER_TEMP" && shasum -a 256 "$archive" > "$archive.sha256")
           echo "ARCHIVE=$RUNNER_TEMP/$archive" >> "$GITHUB_ENV"
           echo "CHECKSUM=$RUNNER_TEMP/$archive.sha256" >> "$GITHUB_ENV"
 
