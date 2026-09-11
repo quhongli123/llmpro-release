@@ -98,6 +98,7 @@ jobs:
           "CHECKSUM=$env:RUNNER_TEMP/$archive.sha256" | Out-File $env:GITHUB_ENV -Append
 
       - name: Upload CLI artifact to existing release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
