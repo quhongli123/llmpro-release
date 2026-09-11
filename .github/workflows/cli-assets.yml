@@ -60,6 +60,8 @@ jobs:
 
       - name: Build standalone CLI
         working-directory: source
+        env:
+          LLMPRO_RELEASE_VERSION: ${{ inputs.release_tag }}
         run: cargo build --release --manifest-path src-tauri/Cargo.toml --bin llmpro-cli
 
       - name: Package Unix artifact
@@ -138,8 +140,23 @@ jobs:
           tmp="\$(mktemp -d)"
           trap 'rm -rf "\$tmp"' EXIT
           install_dir="\${LLMPRO_INSTALL_DIR:-\$HOME/.local/bin}"
-          curl -fsSL "\$base/\$asset" -o "\$tmp/\$asset"
+          current_version=""
+          if [ -x "\$install_dir/llmpro" ]; then
+            current_version="\$("\$install_dir/llmpro" --version 2>/dev/null | sed -n 's/.* \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n1 || true)"
+          fi
+          if [ "\$current_version" = "\$version" ]; then
+            echo "llmpro v\$version is already installed."
+            exit 0
+          elif [ -n "\$current_version" ]; then
+            echo "Updating llmpro v\$current_version -> v\$version"
+          else
+            echo "Installing llmpro v\$version"
+          fi
+          echo "Downloading \$asset"
+          curl -fL --retry 3 --connect-timeout 10 --progress-bar "\$base/\$asset" -o "\$tmp/\$asset"
+          echo "Downloading checksum"
           curl -fsSL "\$base/\$asset.sha256" -o "\$tmp/\$asset.sha256"
+          echo "Verifying SHA-256"
           if command -v sha256sum >/dev/null 2>&1; then
             (cd "\$tmp" && sha256sum -c "\$asset.sha256")
           elif command -v shasum >/dev/null 2>&1; then
@@ -148,10 +165,11 @@ jobs:
             echo "Neither sha256sum nor shasum is available" >&2
             exit 2
           fi
+          echo "Installing binary"
           tar -xzf "\$tmp/\$asset" -C "\$tmp"
           mkdir -p "\$install_dir"
           install -m 755 "\$tmp/llmpro" "\$install_dir/llmpro"
-          echo "Installed llmpro ${version}"
+          echo "Installed llmpro v${version} to \$install_dir/llmpro"
           EOF
           chmod 755 install-llmpro-cli.sh
 
@@ -162,16 +180,36 @@ jobs:
           \$base = '${base}'
           \$asset = "llmpro-cli_\${version}_windows_x86_64.zip"
           \$tmp = Join-Path \$env:TEMP ('llmpro-cli-' + [guid]::NewGuid())
+          \$existing = Join-Path \$InstallDir 'llmpro.exe'
+          \$currentVersion = ''
+          if (Test-Path \$existing) {
+            \$currentOutput = & \$existing --version 2>\$null
+            if (\$currentOutput -match '([0-9]+\.[0-9]+\.[0-9]+)') {
+              \$currentVersion = \$Matches[1]
+            }
+          }
+          if (\$currentVersion -eq \$version) {
+            Write-Output "llmpro v\$version is already installed."
+            exit 0
+          } elseif (\$currentVersion) {
+            Write-Output "Updating llmpro v\$currentVersion -> v\$version"
+          } else {
+            Write-Output "Installing llmpro v\$version"
+          }
           New-Item -ItemType Directory -Force \$tmp | Out-Null
           try {
-            Invoke-WebRequest -Uri "\$base/\$asset" -OutFile (Join-Path \$tmp \$asset)
+            Write-Output "Downloading \$asset"
+            & curl.exe --fail --location --retry 3 --connect-timeout 10 --progress-bar --output (Join-Path \$tmp \$asset) "\$base/\$asset"
+            if (\$LASTEXITCODE -ne 0) { throw "CLI archive download failed with exit code \$LASTEXITCODE" }
+            Write-Output "Downloading checksum"
             Invoke-WebRequest -Uri "\$base/\$asset.sha256" -OutFile (Join-Path \$tmp "\$asset.sha256")
             \$expected = (Get-Content (Join-Path \$tmp "\$asset.sha256") -Raw).Split()[0].ToLowerInvariant()
             \$actual = (Get-FileHash (Join-Path \$tmp \$asset) -Algorithm SHA256).Hash.ToLowerInvariant()
             if (\$expected -ne \$actual) { throw 'SHA256 verification failed' }
+            Write-Output "Installing binary"
             New-Item -ItemType Directory -Force \$InstallDir | Out-Null
             Expand-Archive (Join-Path \$tmp \$asset) -DestinationPath \$InstallDir -Force
-            Write-Output "Installed llmpro ${version} to \$InstallDir"
+            Write-Output "Installed llmpro v${version} to \$InstallDir"
           } finally { Remove-Item \$tmp -Recurse -Force -ErrorAction SilentlyContinue }
           EOF
 
