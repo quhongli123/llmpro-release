@@ -1,0 +1,175 @@
+name: standalone CLI assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'Private source branch or tag to build'
+        required: true
+        default: 'main'
+      release_tag:
+        description: 'Existing public release tag, for example v0.2.72'
+        required: true
+        default: 'v0.2.72'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build CLI (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            os: macos-latest
+            artifact: macos_aarch64
+          - name: Linux x86_64
+            os: ubuntu-22.04
+            artifact: linux_x86_64
+          - name: Windows x86_64
+            os: windows-latest
+            artifact: windows_x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: quhongli123/llmpro
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: source
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl wget file patchelf libssl-dev \
+            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
+            libwebkit2gtk-4.1-dev libsoup-3.0-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './source/src-tauri -> target'
+
+      - name: Build standalone CLI
+        working-directory: source
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml --bin llmpro-cli
+
+      - name: Package Unix artifact
+        if: runner.os != 'Windows'
+        working-directory: source
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ARTIFACT_SUFFIX: ${{ matrix.artifact }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          archive="llmpro-cli_${version}_${ARTIFACT_SUFFIX}.tar.gz"
+          stage="$(mktemp -d)"
+          trap 'rm -rf "$stage"' EXIT
+          install -m 755 src-tauri/target/release/llmpro-cli "$stage/llmpro"
+          tar -C "$stage" -czf "$RUNNER_TEMP/$archive" llmpro
+          shasum -a 256 "$RUNNER_TEMP/$archive" > "$RUNNER_TEMP/$archive.sha256"
+          echo "ARCHIVE=$RUNNER_TEMP/$archive" >> "$GITHUB_ENV"
+          echo "CHECKSUM=$RUNNER_TEMP/$archive.sha256" >> "$GITHUB_ENV"
+
+      - name: Package Windows artifact
+        if: runner.os == 'Windows'
+        working-directory: source
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          $archive = "llmpro-cli_${version}_windows_x86_64.zip"
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/llmpro-cli-stage" | Out-Null
+          Copy-Item "src-tauri/target/release/llmpro-cli.exe" "$env:RUNNER_TEMP/llmpro-cli-stage/llmpro.exe"
+          Compress-Archive -Path "$env:RUNNER_TEMP/llmpro-cli-stage/llmpro.exe" -DestinationPath "$env:RUNNER_TEMP/$archive" -Force
+          $hash = (Get-FileHash "$env:RUNNER_TEMP/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content "$env:RUNNER_TEMP/$archive.sha256"
+          "ARCHIVE=$env:RUNNER_TEMP/$archive" | Out-File $env:GITHUB_ENV -Append
+          "CHECKSUM=$env:RUNNER_TEMP/$archive.sha256" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Upload CLI artifact to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" "$ARCHIVE" "$CHECKSUM" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+  installers:
+    name: Publish installer scripts
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create installer scripts
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          base="https://github.com/quhongli123/llmpro-release/releases/download/${RELEASE_TAG}"
+          cat > install-llmpro-cli.sh <<EOF
+          #!/usr/bin/env sh
+          set -eu
+          version="${version}"
+          base="${base}"
+          os="\$(uname -s)"
+          arch="\$(uname -m)"
+          case "\$os:\$arch" in
+            Darwin:arm64|Darwin:aarch64)
+              asset="llmpro-cli_${version}_macos_aarch64.tar.gz" ;;
+            Linux:x86_64|Linux:amd64)
+              asset="llmpro-cli_${version}_linux_x86_64.tar.gz" ;;
+            *)
+              echo "Unsupported platform: \$os \$arch" >&2
+              exit 2 ;;
+          esac
+          tmp="\$(mktemp -d)"
+          trap 'rm -rf "\$tmp"' EXIT
+          curl -fsSL "\$base/\$asset" -o "\$tmp/\$asset"
+          curl -fsSL "\$base/\$asset.sha256" -o "\$tmp/\$asset.sha256"
+          (cd "\$tmp" && shasum -a 256 -c "\$asset.sha256")
+          tar -xzf "\$tmp/\$asset" -C "\$tmp"
+          install -m 755 "\$tmp/llmpro" "\${LLMPRO_INSTALL_DIR:-\$HOME/.local/bin/llmpro}"
+          echo "Installed llmpro ${version}"
+          EOF
+          chmod 755 install-llmpro-cli.sh
+
+          cat > install-llmpro-cli.ps1 <<EOF
+          param([string]\$InstallDir = "\$HOME\\.local\\bin")
+          \$ErrorActionPreference = 'Stop'
+          \$version = '${version}'
+          \$base = '${base}'
+          \$asset = "llmpro-cli_\${version}_windows_x86_64.zip"
+          \$tmp = Join-Path \$env:TEMP ('llmpro-cli-' + [guid]::NewGuid())
+          New-Item -ItemType Directory -Force \$tmp | Out-Null
+          try {
+            Invoke-WebRequest \"\$base/\$asset\" -OutFile (Join-Path \$tmp \$asset)
+            Invoke-WebRequest \"\$base/\$asset.sha256\" -OutFile (Join-Path \$tmp \"\$asset.sha256\")
+            \$expected = (Get-Content (Join-Path \$tmp \"\$asset.sha256\") -Raw).Split()[0].ToLowerInvariant()
+            \$actual = (Get-FileHash (Join-Path \$tmp \$asset) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if (\$expected -ne \$actual) { throw 'SHA256 verification failed' }
+            New-Item -ItemType Directory -Force \$InstallDir | Out-Null
+            Expand-Archive (Join-Path \$tmp \$asset) -DestinationPath \$InstallDir -Force
+            Write-Output \"Installed llmpro ${version} to \$InstallDir\"
+          } finally { Remove-Item \$tmp -Recurse -Force -ErrorAction SilentlyContinue }
+          EOF
+
+      - name: Upload installer scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" install-llmpro-cli.sh install-llmpro-cli.ps1 \
+            --repo "$GITHUB_REPOSITORY" --clobber
