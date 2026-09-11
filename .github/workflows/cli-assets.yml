@@ -137,11 +137,20 @@ jobs:
           esac
           tmp="\$(mktemp -d)"
           trap 'rm -rf "\$tmp"' EXIT
+          install_dir="\${LLMPRO_INSTALL_DIR:-\$HOME/.local/bin}"
           curl -fsSL "\$base/\$asset" -o "\$tmp/\$asset"
           curl -fsSL "\$base/\$asset.sha256" -o "\$tmp/\$asset.sha256"
-          (cd "\$tmp" && shasum -a 256 -c "\$asset.sha256")
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd "\$tmp" && sha256sum -c "\$asset.sha256")
+          elif command -v shasum >/dev/null 2>&1; then
+            (cd "\$tmp" && shasum -a 256 -c "\$asset.sha256")
+          else
+            echo "Neither sha256sum nor shasum is available" >&2
+            exit 2
+          fi
           tar -xzf "\$tmp/\$asset" -C "\$tmp"
-          install -m 755 "\$tmp/llmpro" "\${LLMPRO_INSTALL_DIR:-\$HOME/.local/bin/llmpro}"
+          mkdir -p "\$install_dir"
+          install -m 755 "\$tmp/llmpro" "\$install_dir/llmpro"
           echo "Installed llmpro ${version}"
           EOF
           chmod 755 install-llmpro-cli.sh
@@ -155,14 +164,14 @@ jobs:
           \$tmp = Join-Path \$env:TEMP ('llmpro-cli-' + [guid]::NewGuid())
           New-Item -ItemType Directory -Force \$tmp | Out-Null
           try {
-            Invoke-WebRequest \"\$base/\$asset\" -OutFile (Join-Path \$tmp \$asset)
-            Invoke-WebRequest \"\$base/\$asset.sha256\" -OutFile (Join-Path \$tmp \"\$asset.sha256\")
-            \$expected = (Get-Content (Join-Path \$tmp \"\$asset.sha256\") -Raw).Split()[0].ToLowerInvariant()
+            Invoke-WebRequest -Uri "\$base/\$asset" -OutFile (Join-Path \$tmp \$asset)
+            Invoke-WebRequest -Uri "\$base/\$asset.sha256" -OutFile (Join-Path \$tmp "\$asset.sha256")
+            \$expected = (Get-Content (Join-Path \$tmp "\$asset.sha256") -Raw).Split()[0].ToLowerInvariant()
             \$actual = (Get-FileHash (Join-Path \$tmp \$asset) -Algorithm SHA256).Hash.ToLowerInvariant()
             if (\$expected -ne \$actual) { throw 'SHA256 verification failed' }
             New-Item -ItemType Directory -Force \$InstallDir | Out-Null
             Expand-Archive (Join-Path \$tmp \$asset) -DestinationPath \$InstallDir -Force
-            Write-Output \"Installed llmpro ${version} to \$InstallDir\"
+            Write-Output "Installed llmpro ${version} to \$InstallDir"
           } finally { Remove-Item \$tmp -Recurse -Force -ErrorAction SilentlyContinue }
           EOF
 
