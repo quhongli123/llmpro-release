@@ -165,6 +165,7 @@ jobs:
 
     steps:
       # 拉取私有源码（需要一个能读私有仓的 PAT，存为 secret: SOURCE_REPO_TOKEN）
+      # fetch-depth: 0 —— 生成发布说明需要完整历史与 tag
       - name: Checkout private source
         uses: actions/checkout@v4
         with:
@@ -172,6 +173,44 @@ jobs:
           ref: ${{ github.event.inputs.source_ref }}
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           path: source
+          fetch-depth: 0
+
+      # 从上一个 tag 到本次 tag 的提交记录生成发布说明，
+      # tauri-action 会把它写进 GitHub Release body 与 latest.json 的 notes。
+      - name: Generate release notes
+        id: release_notes
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          TAG="${RELEASE_TAG#v}"
+          PREV="$(git -C source describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true)"
+          {
+            if [ -n "${PREV}" ]; then
+              echo "## 更新内容（${PREV} → v${TAG}）"
+              echo
+              git -C source log --pretty=format:'- %s (%h)' --no-merges "${PREV}..${RELEASE_TAG}" | head -30
+              echo
+              COUNT="$(git -C source rev-list --count --no-merges "${PREV}..${RELEASE_TAG}")"
+              if [ "${COUNT}" -gt 30 ]; then
+                echo "- ……及其余 $((COUNT - 30)) 个提交"
+              fi
+            else
+              echo "## 更新内容（v${TAG}）"
+              echo
+              git -C source log --pretty=format:'- %s (%h)' --no-merges -30
+            fi
+            echo
+            echo '---'
+            echo '应用内会自动检测并提示更新。'
+          } > /tmp/release-notes.md
+          {
+            echo 'notes<<RELEASE_NOTES_EOF'
+            cat /tmp/release-notes.md
+            echo 'RELEASE_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+          echo "---- generated release notes ----"
+          cat /tmp/release-notes.md
 
       - name: Install Linux system deps (WebKitGTK etc.)
         if: matrix.platform == 'ubuntu-22.04'
@@ -275,7 +314,7 @@ jobs:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
           releaseName: 'llmpro ${{ github.event.inputs.release_tag }}'
-          releaseBody: '应用内会自动检测并提示更新。'
+          releaseBody: ${{ steps.release_notes.outputs.notes }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
