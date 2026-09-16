@@ -61,7 +61,7 @@ jobs:
       - name: Build Windows test installers
         working-directory: source
         shell: pwsh
-        run: pnpm run build:app -- --bundles msi,nsis --config src-tauri/tauri.ci.conf.json
+        run: pnpm exec tauri build --bundles msi,nsis --config src-tauri/tauri.ci.conf.json
 
       - name: Upload Windows test installers
         uses: actions/upload-artifact@v4
