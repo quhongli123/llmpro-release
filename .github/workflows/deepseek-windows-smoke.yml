@@ -1,0 +1,36 @@
+name: DeepSeek Windows smoke
+
+on:
+  push:
+    branches:
+      - quhongli/deepseek-windows-node24
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: quhongli123/llmpro
+          ref: quhongli/deepseek-windows-node24
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: source
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.3
+
+      - name: Setup managed Node version
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+
+      - name: Run real-patch DeepSeek smoke
+        working-directory: source
+        shell: pwsh
+        run: node scripts/ci/deepseek-web-smoke.mjs
