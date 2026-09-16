@@ -128,7 +128,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.21.0
           cache: pnpm
           cache-dependency-path: source/pnpm-lock.yaml
 
@@ -148,6 +148,8 @@ jobs:
         if: matrix.name == 'windows'
         working-directory: source
         shell: pwsh
+        env:
+          LLMPRO_DEEPSEEK_RUST_SMOKE: '1'
         run: pnpm test:deepseek-smoke
 
       - name: Validate source
