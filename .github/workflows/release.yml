@@ -144,6 +144,12 @@ jobs:
         working-directory: source
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Windows DeepSeek Web install and launch
+        if: matrix.name == 'windows'
+        working-directory: source
+        shell: pwsh
+        run: pnpm test:deepseek-smoke
+
       - name: Validate source
         working-directory: source
         run: |
