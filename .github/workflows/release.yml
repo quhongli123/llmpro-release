@@ -390,13 +390,33 @@ jobs:
             -k="$OBS_SECRET_KEY" \
             -e="$OBS_ENDPOINT"
 
+          upload_pids=()
+          upload_names=()
           while IFS= read -r -d '' file; do
             name="$(basename "$file")"
-            "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/$name" \
-              "obs://$OBS_BUCKET/llmpro/$version/$name" \
-              -f \
-              -acl=public-read
+            (
+              "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/$name" \
+                "obs://$OBS_BUCKET/llmpro/$version/$name" \
+                -f \
+                -acl=public-read \
+                -threshold=1 \
+                -ps=5MB \
+                -p=4
+            ) &
+            upload_pids+=("$!")
+            upload_names+=("$name")
           done < <(find "$GITHUB_WORKSPACE/.obs-upload" -maxdepth 1 -type f -print0)
+
+          upload_failed=0
+          for index in "${!upload_pids[@]}"; do
+            if ! wait "${upload_pids[$index]}"; then
+              echo "::error title=OBS upload failed::${upload_names[$index]}"
+              upload_failed=1
+            fi
+          done
+          if [ "$upload_failed" -ne 0 ]; then
+            exit 1
+          fi
 
           "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/latest.json" \
             "obs://$OBS_BUCKET/llmpro/latest.json" \
