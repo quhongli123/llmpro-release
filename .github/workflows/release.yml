@@ -1,4 +1,4 @@
-name: Windows Codex launch test package
+name: Windows release candidate package
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       source_ref:
         description: 'Pinned private llmpro source commit'
         required: true
-        default: '12d9c17afb33a8a616fa9dde879289b1ba1eb3d2'
+        default: '1fd74d5'
 
 permissions:
   contents: read
@@ -47,6 +47,13 @@ jobs:
         working-directory: source
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Windows DeepSeek Web install and launch
+        working-directory: source
+        shell: pwsh
+        env:
+          LLMPRO_DEEPSEEK_RUST_SMOKE: '1'
+        run: pnpm test:deepseek-smoke
+
       - name: Validate source and Windows launch tests
         working-directory: source
         run: |
@@ -64,14 +71,14 @@ jobs:
       - name: Verify installers
         shell: pwsh
         run: |
-          $installers = @(Get-ChildItem source/src-tauri/target/release/bundle -Recurse -File | Where-Object { $_.Extension -in '.exe', '.msi' -and $_.Name -like 'llmpro_0.2.113*' })
-          if ($installers.Count -lt 2) { throw 'Expected both NSIS and MSI installers for version 0.2.113' }
+          $installers = @(Get-ChildItem source/src-tauri/target/release/bundle -Recurse -File | Where-Object { $_.Extension -in '.exe', '.msi' -and $_.Name -like 'llmpro_0.2.115*' })
+          if ($installers.Count -lt 2) { throw 'Expected both NSIS and MSI installers for version 0.2.115' }
           $installers | ForEach-Object { Write-Output "$($_.Name) $($_.Length) bytes SHA256=$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)" }
 
       - name: Upload test installers
         uses: actions/upload-artifact@v4
         with:
-          name: llmpro-0.2.113-windows-codex-launch-test
+          name: llmpro-0.2.115-windows-release-candidate
           retention-days: 14
           if-no-files-found: error
           path: |
