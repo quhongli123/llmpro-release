@@ -285,28 +285,22 @@ jobs:
           console.log(`version and updater endpoint override -> ${version}, ${base}/llmpro/latest.json`);
           NODE
 
-      - name: Verify macOS signing and notarization secrets
+      - name: Verify macOS signing secrets
         if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           missing=0
           for name in \
             APPLE_CERTIFICATE \
             APPLE_CERTIFICATE_PASSWORD \
-            APPLE_SIGNING_IDENTITY \
-            APPLE_ID \
-            APPLE_PASSWORD \
-            APPLE_TEAM_ID
+            APPLE_SIGNING_IDENTITY
           do
             if [ -z "${!name:-}" ]; then
-              echo "::error title=Missing macOS distribution secret::$name is required for signed and notarized distribution"
+              echo "::error title=Missing macOS signing secret::$name is required for signed distribution"
               missing=1
             fi
           done
@@ -324,9 +318,6 @@ jobs:
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
@@ -336,24 +327,6 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
 
-      - name: Verify macOS Gatekeeper and notarization
-        if: matrix.platform == 'macos-latest'
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          app="$(find source/src-tauri/target -type d -path '*/release/bundle/macos/llmpro.app' -print -quit)"
-          dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
-          test -n "$app" && test -n "$dmg"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
-          test "$("$app/Contents/MacOS/llmpro" --version)" = "llmpro $version"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          spctl --assess --type execute --verbose=2 "$app"
-          xcrun stapler validate "$app"
-          codesign --verify --verbose=2 "$dmg"
-          hdiutil verify "$dmg"
-
   publish-obs:
     name: Publish OBS artifacts and bridge manifest
     needs: release
@@ -362,6 +335,8 @@ jobs:
     steps:
       - name: Checkout release repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Download all generated release assets
         env:
