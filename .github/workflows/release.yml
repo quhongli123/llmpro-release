@@ -314,6 +314,20 @@ jobs:
             exit 1
           fi
 
+      - name: Store Apple notary credentials
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool store-credentials llmpro-notary \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID"
+          echo "APPLE_NOTARY_PROFILE=llmpro-notary" >> "$GITHUB_ENV"
+
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
       - name: Build & publish signed release
         uses: tauri-apps/tauri-action@v0
@@ -324,9 +338,6 @@ jobs:
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
@@ -339,9 +350,7 @@ jobs:
       - name: Notarize and staple macOS app and DMG
         if: matrix.platform == 'macos-latest'
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_NOTARY_PROFILE: ${{ env.APPLE_NOTARY_PROFILE }}
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
@@ -352,18 +361,10 @@ jobs:
 
           app_zip="${RUNNER_TEMP}/llmpro.app.zip"
           ditto -c -k --keepParent "$app" "$app_zip"
-          xcrun notarytool submit "$app_zip" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
+          xcrun notarytool submit "$app_zip" --keychain-profile "$APPLE_NOTARY_PROFILE" --wait
           xcrun stapler staple "$app"
 
-          xcrun notarytool submit "$dmg" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
+          xcrun notarytool submit "$dmg" --keychain-profile "$APPLE_NOTARY_PROFILE" --wait
           xcrun stapler staple "$dmg"
 
       - name: Verify macOS Gatekeeper and notarization
