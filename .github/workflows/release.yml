@@ -292,7 +292,7 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
@@ -302,7 +302,7 @@ jobs:
             APPLE_CERTIFICATE_PASSWORD \
             APPLE_SIGNING_IDENTITY \
             APPLE_ID \
-            APPLE_PASSWORD \
+            APPLE_APP_SPECIFIC_PASSWORD \
             APPLE_TEAM_ID
           do
             if [ -z "${!name:-}" ]; then
@@ -318,13 +318,13 @@ jobs:
         if: matrix.platform == 'macos-latest'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           xcrun notarytool store-credentials llmpro-notary \
             --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID"
           echo "APPLE_NOTARY_PROFILE=llmpro-notary" >> "$GITHUB_ENV"
 
