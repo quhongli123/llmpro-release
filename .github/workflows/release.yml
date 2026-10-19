@@ -22,11 +22,6 @@ on:
         description: '构建平台：macos,windows,linux 的逗号分隔组合'
         required: true
         default: 'macos,windows,linux'
-      sign_macos:
-        description: '是否签名并公证 macOS 包'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -291,7 +286,7 @@ jobs:
           NODE
 
       - name: Verify macOS signing and notarization secrets
-        if: matrix.platform == 'macos-latest' && inputs.sign_macos
+        if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -321,18 +316,17 @@ jobs:
 
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
       - name: Build & publish signed release
-        if: inputs.sign_macos
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
@@ -342,24 +336,38 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
 
-      - name: Build & publish unsigned macOS release
-        if: inputs.sign_macos != true
-        uses: tauri-apps/tauri-action@v0
+      - name: Notarize and staple macOS app and DMG
+        if: matrix.platform == 'macos-latest'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: source
-          tagName: ${{ github.event.inputs.release_tag }}
-          releaseName: 'llmpro ${{ github.event.inputs.release_tag }}'
-          releaseBody: ${{ steps.release_notes.outputs.notes }}
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          app="$(find source/src-tauri/target -type d -path '*/release/bundle/macos/llmpro.app' -print -quit)"
+          dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
+          test -n "$app" && test -n "$dmg"
+
+          app_zip="${RUNNER_TEMP}/llmpro.app.zip"
+          ditto -c -k --keepParent "$app" "$app_zip"
+          xcrun notarytool submit "$app_zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$app"
+
+          xcrun notarytool submit "$dmg" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$dmg"
 
       - name: Verify macOS Gatekeeper and notarization
-        if: matrix.platform == 'macos-latest' && inputs.sign_macos
+        if: matrix.platform == 'macos-latest'
         env:
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
@@ -374,19 +382,10 @@ jobs:
           spctl --assess --type execute --verbose=2 "$app"
           xcrun stapler validate "$app"
           codesign --verify --verbose=2 "$dmg"
-          hdiutil verify "$dmg"
-
-      - name: Verify macOS bundle without signature
-        if: matrix.platform == 'macos-latest' && inputs.sign_macos != true
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          app="$(find source/src-tauri/target -type d -path '*/release/bundle/macos/llmpro.app' -print -quit)"
-          dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
-          test -n "$app" && test -n "$dmg"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
+          spctl --assess --type open \
+            --context context:primary-signature \
+            --verbose=2 "$dmg"
+          xcrun stapler validate "$dmg"
           hdiutil verify "$dmg"
 
   publish-obs:
