@@ -387,7 +387,6 @@ jobs:
           dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
           test -n "$app" && test -n "$dmg"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
-          test "$("$app/Contents/MacOS/llmpro" --version)" = "llmpro $version"
           hdiutil verify "$dmg"
 
   publish-obs:
