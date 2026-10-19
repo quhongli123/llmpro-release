@@ -22,11 +22,6 @@ on:
         description: '构建平台：macos,windows,linux 的逗号分隔组合'
         required: true
         default: 'macos,windows,linux'
-      sign_macos:
-        description: '是否签名并公证 macOS 包'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -287,31 +282,26 @@ jobs:
             },
           };
           fs.writeFileSync('version-override.json', `${JSON.stringify(config)}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `LLMPRO_VERSION=${version}\n`);
           console.log(`version and updater endpoint override -> ${version}, ${base}/llmpro/latest.json`);
           NODE
 
-      - name: Verify macOS signing and notarization secrets
-        if: matrix.platform == 'macos-latest' && inputs.sign_macos
+      - name: Verify macOS signing secrets
+        if: matrix.platform == 'macos-latest'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           missing=0
           for name in \
             APPLE_CERTIFICATE \
             APPLE_CERTIFICATE_PASSWORD \
-            APPLE_SIGNING_IDENTITY \
-            APPLE_ID \
-            APPLE_PASSWORD \
-            APPLE_TEAM_ID
+            APPLE_SIGNING_IDENTITY
           do
             if [ -z "${!name:-}" ]; then
-              echo "::error title=Missing macOS distribution secret::$name is required for signed and notarized distribution"
+              echo "::error title=Missing macOS signing secret::$name is required for signed distribution"
               missing=1
             fi
           done
@@ -321,18 +311,14 @@ jobs:
 
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
       - name: Build & publish signed release
-        if: inputs.sign_macos
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
         with:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
@@ -342,24 +328,8 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
 
-      - name: Build & publish unsigned macOS release
-        if: inputs.sign_macos != true
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: source
-          tagName: ${{ github.event.inputs.release_tag }}
-          releaseName: 'llmpro ${{ github.event.inputs.release_tag }}'
-          releaseBody: ${{ steps.release_notes.outputs.notes }}
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
-
-      - name: Verify macOS Gatekeeper and notarization
-        if: matrix.platform == 'macos-latest' && inputs.sign_macos
+      - name: Verify macOS Developer ID signatures and DMG contents
+        if: matrix.platform == 'macos-latest'
         env:
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
@@ -371,23 +341,16 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
           test "$("$app/Contents/MacOS/llmpro" --version)" = "llmpro $version"
           codesign --verify --deep --strict --verbose=2 "$app"
-          spctl --assess --type execute --verbose=2 "$app"
-          xcrun stapler validate "$app"
+          codesign --display --verbose=4 "$app" 2>&1 | grep -F 'Authority=Developer ID Application:'
           codesign --verify --verbose=2 "$dmg"
+          codesign --display --verbose=4 "$dmg" 2>&1 | grep -F 'Authority=Developer ID Application:'
           hdiutil verify "$dmg"
-
-      - name: Verify macOS bundle without signature
-        if: matrix.platform == 'macos-latest' && inputs.sign_macos != true
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          app="$(find source/src-tauri/target -type d -path '*/release/bundle/macos/llmpro.app' -print -quit)"
-          dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
-          test -n "$app" && test -n "$dmg"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
-          hdiutil verify "$dmg"
+          mount_dir="$(mktemp -d)"
+          trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true; rmdir "$mount_dir" 2>/dev/null || true' EXIT
+          hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mount_dir"
+          codesign --verify --deep --strict --verbose=2 "$mount_dir/llmpro.app"
+          test "$("$mount_dir/llmpro.app/Contents/MacOS/llmpro" --version)" = "llmpro $version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$mount_dir/llmpro.app/Contents/Info.plist")" = "$version"
 
   publish-obs:
     name: Publish OBS artifacts and bridge manifest
@@ -397,6 +360,8 @@ jobs:
     steps:
       - name: Checkout release repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Download all generated release assets
         env:
