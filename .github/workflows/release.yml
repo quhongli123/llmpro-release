@@ -321,6 +321,7 @@ jobs:
 
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
       - name: Build & publish signed release
+        if: inputs.sign_macos
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -332,6 +333,22 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && inputs.sign_macos && secrets.APPLE_TEAM_ID || '' }}
+        with:
+          projectPath: source
+          tagName: ${{ github.event.inputs.release_tag }}
+          releaseName: 'llmpro ${{ github.event.inputs.release_tag }}'
+          releaseBody: ${{ steps.release_notes.outputs.notes }}
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
+
+      - name: Build & publish unsigned macOS release
+        if: inputs.sign_macos != true
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
