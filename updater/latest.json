@@ -1,39 +1,15 @@
 {
-  "version": "0.2.127",
-  "notes": "## 更新内容（v0.2.126 → v0.2.127）\n\n- fix: enable Claude Desktop SSH remote sessions by default (aecb8fa)\n\n---\n应用内会自动检测并提示更新。",
-  "pub_date": "2026-10-19T09:01:43.228Z",
+  "version": "0.2.128",
+  "notes": "## 更新内容（v0.2.127 → v0.2.128）\n\n- chore(release): prepare macOS signed repair v0.2.128 [skip actions] (b64e310)\n\n---\n应用内会自动检测并提示更新。",
+  "pub_date": "2026-10-19T10:20:28.397Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTZVdExrNmU5N3labHVuSG5YaEM1OTAveHRJZmRheGErYTIyUE5TdUhhQlc1RWdMYWEvcCs2V25lVWFxWVd2YjArWTFQQUphY1dGL3A2d3I0M09vbUEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDAwNDk3CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKL2JMcCtVVDdodklNR053Z1FTVGd1VnVUZjYvSUJyZjI1Ly92NXo1eDYwS2RFOEJYOEJLTU1MQmVKVHRtaXlOTndBRlRYMjZyV2R6N3NvSFNWMi8rQWc9PQo=",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTU5QWN1d3dhYzI5QUpQdTEvMWlFQ1UyVDhQSWlSWkV0bXlJNmpidmxCS3JuRDlWajBEcWQvMzh1ZlgzdFJBYUx4NFBtcTYzWnBPNlh5L2pNVVJscUFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDA1MjE4CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKa3FrZXczWEt0cHpudnBPeGxxd0JjcUR2cDVyRVcrTDA1cUlwUm5pWjNLMEVwWlNuckt2UDZoeW5YTTZuRVlnb0x2Q0dnOUJrcWJ4QSt4SmIzSmYxQ0E9PQo=",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.128/llmpro_aarch64.app.tar.gz"
     },
     "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTZVdExrNmU5N3labHVuSG5YaEM1OTAveHRJZmRheGErYTIyUE5TdUhhQlc1RWdMYWEvcCs2V25lVWFxWVd2YjArWTFQQUphY1dGL3A2d3I0M09vbUEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDAwNDk3CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKL2JMcCtVVDdodklNR053Z1FTVGd1VnVUZjYvSUJyZjI1Ly92NXo1eDYwS2RFOEJYOEJLTU1MQmVKVHRtaXlOTndBRlRYMjZyV2R6N3NvSFNWMi8rQWc9PQo=",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_aarch64.app.tar.gz"
-    },
-    "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTY4ZmIyaVptZ1JLeDkraVZlMkdvUHNBL0I3M3pGc1JUcmw1b1VLbkcrTktoZXdkb3o2Wjl0cWRKaVVwVTFEc3BoeVhBVU9MUTd0UGdmQ0ptNUo5aXc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzk5MTk1CWZpbGU6bGxtcHJvXzAuMi4xMjdfeDY0X2VuLVVTLm1zaQppSFFDK2tPMHJSbjZ4WmpRaktLaU9ZanRmbEdFUVZrbkkyMzlsaUl6Q1diazhUaTFCSTVsdm9JSmsxZWNvaEJ3Nm1OK2VRQlMza29nRHFJbWhqRERCQT09Cg==",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_0.2.127_x64_en-US.msi"
-    },
-    "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTY4ZmIyaVptZ1JLeDkraVZlMkdvUHNBL0I3M3pGc1JUcmw1b1VLbkcrTktoZXdkb3o2Wjl0cWRKaVVwVTFEc3BoeVhBVU9MUTd0UGdmQ0ptNUo5aXc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzk5MTk1CWZpbGU6bGxtcHJvXzAuMi4xMjdfeDY0X2VuLVVTLm1zaQppSFFDK2tPMHJSbjZ4WmpRaktLaU9ZanRmbEdFUVZrbkkyMzlsaUl6Q1diazhUaTFCSTVsdm9JSmsxZWNvaEJ3Nm1OK2VRQlMza29nRHFJbWhqRERCQT09Cg==",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_0.2.127_x64_en-US.msi"
-    },
-    "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTVvMkEwdFdqeSsxUWhMRG9ya0RUTnhNMlVlc1pubHVyalRzbVp0VFgzc3lqMEdkazVMc2JaYU9nT2lIbHA5TEJEZUgzWU11djhQWHUrYkt2ZjliREFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzk5MTk1CWZpbGU6bGxtcHJvXzAuMi4xMjdfeDY0LXNldHVwLmV4ZQpWL2prQVJrb2liZjVmUk9LVXQ1Umt3Ym43MzZscFBSSmhwVWRHdnVZaXdqYitIK29YY25yWXYzWWRNWSszL3UvVEI2eG0vVmY2bXdNYWU3WVpUeHNBQT09Cg==",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_0.2.127_x64-setup.exe"
-    },
-    "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXpxZG9GaWVTdWxibnYxcm92V29CcnFwT0xMaUV4N3NrYkJyUVh3eXNlbVBsR3UvbHdIdHRuV2FHd09aTFpOaGkyMVBWNFlPbkRZRldoRzlsT1cwZ2d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzk5NzI5CWZpbGU6bGxtcHJvXzAuMi4xMjdfYW1kNjQuQXBwSW1hZ2UKRmI0d1VMTy9zbjBsWmVNRTRWUlB4NG50Y01yeDBNOGd0QzZ3eExYL1RJL05OR05LTWhMMnVyOFloM0IzTmVnWEZmVVd3RWxkVEh1aW5Wbk5tdmUxQkE9PQo=",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_0.2.127_amd64.AppImage"
-    },
-    "linux-x86_64-appimage": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZXpxZG9GaWVTdWxibnYxcm92V29CcnFwT0xMaUV4N3NrYkJyUVh3eXNlbVBsR3UvbHdIdHRuV2FHd09aTFpOaGkyMVBWNFlPbkRZRldoRzlsT1cwZ2d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzk5NzI5CWZpbGU6bGxtcHJvXzAuMi4xMjdfYW1kNjQuQXBwSW1hZ2UKRmI0d1VMTy9zbjBsWmVNRTRWUlB4NG50Y01yeDBNOGd0QzZ3eExYL1RJL05OR05LTWhMMnVyOFloM0IzTmVnWEZmVVd3RWxkVEh1aW5Wbk5tdmUxQkE9PQo=",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_0.2.127_amd64.AppImage"
-    },
-    "linux-x86_64-deb": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTVzaUcwV25kc3VKMnVyM1h3c3p0VXJZNUN1dUdnbEFDcmxBMkNMRzV4enFMeHYxVTR5emVZSGpFbjE5R2dsc1JUVUZMa2NzMlFmUC82MVh1c2gzSGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzk5NzI5CWZpbGU6bGxtcHJvXzAuMi4xMjdfYW1kNjQuZGViCkI2bTlvSXlGVElRemRPZi82NzdpdS82NW9Gemg3OGNkMWNvU1pEVncyRnZMZDFTYm5wWGhGTHhMaXB1ZVI1UE8rNWNreVpOMXpIbUhvalJ2dDZ1WkRRPT0K",
-      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.127/llmpro_0.2.127_amd64.deb"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTU5QWN1d3dhYzI5QUpQdTEvMWlFQ1UyVDhQSWlSWkV0bXlJNmpidmxCS3JuRDlWajBEcWQvMzh1ZlgzdFJBYUx4NFBtcTYzWnBPNlh5L2pNVVJscUFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNDA1MjE4CWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKa3FrZXczWEt0cHpudnBPeGxxd0JjcUR2cDVyRVcrTDA1cUlwUm5pWjNLMEVwWlNuckt2UDZoeW5YTTZuRVlnb0x2Q0dnOUJrcWJ4QSt4SmIzSmYxQ0E9PQo=",
+      "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.128/llmpro_aarch64.app.tar.gz"
     }
   }
 }
