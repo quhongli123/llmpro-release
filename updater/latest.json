@@ -1,14 +1,14 @@
 {
   "version": "0.2.130",
   "notes": "## 更新内容（v0.2.129 → v0.2.130）\n\n- fix(codex): prepare reasoning-compatible v0.2.130 (40d21da)\n\n---\n应用内会自动检测并提示更新。",
-  "pub_date": "2026-10-21T08:36:27.885Z",
+  "pub_date": "2026-10-21T08:47:56.913Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTRJQU93MVBPNGRwZ05rbHJLSVFWblpGWkd6U2h0SWZ4Vk0vOWVRWW5PcE9Vb3dadjVlZ0FWd3QydEtOYWh6TWtiVWxSZkUrWHV5U29JbldxTWNCVGdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTcxMTQzCWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKRG5PNmMyMjQ0Q25objhNOXBJdmtLL0luQ09HZkNIbFNzV2FHeHZ2MGhqVGhIdEFrNS9LMUFzd2YrTG9hcmhyTWlYRjY2NUlwTm5SVFhxeGZIaWR1QXc9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTB3YWJqRmMzMjNYVDk1TG82ZkxPTTdmM0I3QkxObmNhV01tandoaVdZY3E4UHZYZFZhT3NERTRvYnZGZWRQQTZaMmxQaSt4bDdxZXJJaE5CT04xaEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTcyNDcwCWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKSTQ1VU1EUGZwMXZlNVlPOGJKSTRuazRzdWszMHZNTGJHOURlaURyTW9abTZGTUNpUjVpTjBIMUZBcS9EVmhBeVp0K2tzZUF6N3RrcWd2S3A0cWU4Q0E9PQo=",
       "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.130/llmpro_aarch64.app.tar.gz"
     },
     "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTRJQU93MVBPNGRwZ05rbHJLSVFWblpGWkd6U2h0SWZ4Vk0vOWVRWW5PcE9Vb3dadjVlZ0FWd3QydEtOYWh6TWtiVWxSZkUrWHV5U29JbldxTWNCVGdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTcxMTQzCWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKRG5PNmMyMjQ0Q25objhNOXBJdmtLL0luQ09HZkNIbFNzV2FHeHZ2MGhqVGhIdEFrNS9LMUFzd2YrTG9hcmhyTWlYRjY2NUlwTm5SVFhxeGZIaWR1QXc9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXBRcG1uWkdtZTB3YWJqRmMzMjNYVDk1TG82ZkxPTTdmM0I3QkxObmNhV01tandoaVdZY3E4UHZYZFZhT3NERTRvYnZGZWRQQTZaMmxQaSt4bDdxZXJJaE5CT04xaEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTcyNDcwCWZpbGU6bGxtcHJvLmFwcC50YXIuZ3oKSTQ1VU1EUGZwMXZlNVlPOGJKSTRuazRzdWszMHZNTGJHOURlaURyTW9abTZGTUNpUjVpTjBIMUZBcS9EVmhBeVp0K2tzZUF6N3RrcWd2S3A0cWU4Q0E9PQo=",
       "url": "https://playground-modelbest.obs.cn-north-4.myhuaweicloud.com/llmpro/0.2.130/llmpro_aarch64.app.tar.gz"
     },
     "windows-x86_64": {
