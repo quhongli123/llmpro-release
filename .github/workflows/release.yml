@@ -389,6 +389,21 @@ jobs:
           xcrun stapler validate "$dmg"
           hdiutil verify "$dmg"
 
+      - name: Replace GitHub Release DMG with stapled artifact
+        if: matrix.platform == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
+          test -n "$dmg"
+          xcrun stapler validate "$dmg"
+          gh release upload "$RELEASE_TAG" "$dmg" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
   publish-obs:
     name: Publish OBS artifacts and bridge manifest
     needs: release
