@@ -2,7 +2,7 @@ name: release
 
 # 这个 workflow 属于【公开发布仓 llmpro-release】。
 # 它在构建时临时拉取【私有源码仓 llmpro】的代码（源码不会进入本仓库），
-# 三平台编译签名安装包，上传到 Huawei Cloud OBS，并同步一个 GitHub
+# 编译签名 macOS/Windows 安装包，上传到 Huawei Cloud OBS，并同步一个 GitHub
 # bridge latest.json，兼容已经安装的旧版本。
 #
 # 手动发版：Actions -> release -> Run workflow，填写：
@@ -21,7 +21,7 @@ on:
       platforms:
         description: '构建平台：macos,windows,linux 的逗号分隔组合'
         required: true
-        default: 'macos,windows,linux'
+        default: 'macos,windows'
 
 permissions:
   contents: write
