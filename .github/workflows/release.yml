@@ -338,6 +338,10 @@ jobs:
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          # Notarize the app before Tauri creates the DMG and updater archive.
+          APPLE_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && (secrets.APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_PASSWORD) || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: source
           tagName: ${{ github.event.inputs.release_tag }}
@@ -388,6 +392,23 @@ jobs:
             --verbose=2 "$dmg"
           xcrun stapler validate "$dmg"
           hdiutil verify "$dmg"
+
+          updater="${app}.tar.gz"
+          test -f "$updater"
+          extracted="$(mktemp -d)"
+          tar -xzf "$updater" -C "$extracted"
+          codesign --verify --deep --strict --verbose=2 "$extracted/llmpro.app"
+          spctl --assess --type execute --verbose=2 "$extracted/llmpro.app"
+          xcrun stapler validate "$extracted/llmpro.app"
+
+          mount="$(mktemp -d)"
+          trap 'hdiutil detach "$mount" -quiet >/dev/null 2>&1 || true' EXIT
+          hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mount"
+          codesign --verify --deep --strict --verbose=2 "$mount/llmpro.app"
+          spctl --assess --type execute --verbose=2 "$mount/llmpro.app"
+          xcrun stapler validate "$mount/llmpro.app"
+          hdiutil detach "$mount" -quiet
+          trap - EXIT
 
       - name: Replace GitHub Release DMG with stapled artifact
         if: matrix.platform == 'macos-latest'
