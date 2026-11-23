@@ -150,7 +150,8 @@ jobs:
         working-directory: source
         run: |
           pnpm typecheck
-          pnpm test:unit
+          # Longer DOM interaction tests can exceed Vitest's default on Windows runners.
+          pnpm test:unit ${{ runner.os == 'Windows' && '--testTimeout=10000' || '' }}
           pnpm build:renderer
           cargo test --locked --lib --manifest-path src-tauri/Cargo.toml llmcenter:: -- --test-threads=1
 
