@@ -31,7 +31,7 @@ function compareVersions(left, right) {
 
 const releaseTag = required('RELEASE_TAG');
 const version = releaseTag.replace(/^v/, '');
-if (!/^\d+\.\d+\.\d+$/.test(version)) {
+if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(releaseTag)) {
   throw new Error(`Invalid release tag: ${releaseTag}`);
 }
 
@@ -55,38 +55,67 @@ const assetNames = new Set(
 );
 const versionBaseUrl = `${publicBaseUrl}/llmpro/${version}`;
 
+const installers = [
+  `llmpro_${version}_aarch64.dmg`,
+  `llmpro_${version}_x64-setup.exe`,
+  `llmpro_${version}_x64_en-US.msi`,
+];
+for (const installer of installers) {
+  if (!assetNames.has(installer) || statSync(join(releaseDir, installer)).size === 0) {
+    throw new Error(`Missing or empty installer: ${installer}`);
+  }
+}
+
+const macUpdater = 'llmpro_aarch64.app.tar.gz';
+const [, nsis, msi] = installers;
+const expectedUpdaters = {
+  'darwin-aarch64': [macUpdater],
+  'darwin-aarch64-app': [macUpdater],
+  'windows-x86_64': [nsis, msi],
+  'windows-x86_64-nsis': [nsis],
+  'windows-x86_64-msi': [msi],
+};
+for (const platform of ['darwin-aarch64', 'windows-x86_64', 'windows-x86_64-nsis', 'windows-x86_64-msi']) {
+  if (!manifest.platforms?.[platform]) {
+    throw new Error(`Missing signed updater for ${platform}`);
+  }
+}
+
 for (const [platform, target] of Object.entries(manifest.platforms ?? {})) {
   if (!target?.url || !target?.signature) {
     throw new Error(`Manifest entry is incomplete: ${platform}`);
   }
   const fileName = basename(new URL(target.url).pathname);
-  if (!assetNames.has(fileName)) {
-    throw new Error(`Manifest asset is missing from release: ${fileName}`);
+  if (!Object.hasOwn(expectedUpdaters, platform) || !expectedUpdaters[platform].includes(fileName)) {
+    throw new Error(`Unexpected updater asset for ${platform}: ${fileName}`);
+  }
+  if (!assetNames.has(fileName) || statSync(join(releaseDir, fileName)).size === 0) {
+    throw new Error(`Manifest asset is missing or empty: ${fileName}`);
+  }
+  const signatureFile = `${fileName}.sig`;
+  if (!assetNames.has(signatureFile) ||
+      readFileSync(join(releaseDir, signatureFile), 'utf8').trim() !== target.signature.trim()) {
+    throw new Error(`Updater signature does not match ${fileName}`);
   }
   target.url = `${versionBaseUrl}/${fileName}`;
 }
 
 mkdirSync(uploadDir, { recursive: true });
-for (const fileName of assetNames) {
+const versionedAssets = [...installers, macUpdater, ...[macUpdater, nsis, msi].map((file) => `${file}.sig`)];
+for (const fileName of versionedAssets) {
   copyFileSync(join(releaseDir, fileName), join(uploadDir, fileName));
 }
 writeFileSync(join(uploadDir, 'latest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
-let shouldPublishStableManifest = true;
 if (existsSync(stableManifestPath)) {
   const current = JSON.parse(readFileSync(stableManifestPath, 'utf8'));
   if (!/^\d+\.\d+\.\d+$/.test(current.version ?? '')) {
     throw new Error(`Invalid stable manifest version: ${current.version}`);
   }
-  shouldPublishStableManifest = compareVersions(version, current.version) >= 0;
+  if (compareVersions(version, current.version) < 0) {
+    throw new Error(`The GitHub bridge already serves ${current.version}`);
+  }
 }
-
-if (shouldPublishStableManifest) {
-  mkdirSync(join(stableManifestPath, '..'), { recursive: true });
-  writeFileSync(stableManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`Stable manifest updated to ${version}.`);
-} else {
-  console.log(`Stable manifest kept; ${version} is older than the current version.`);
-}
-
-console.log(`Prepared OBS upload directory: ${uploadDir}`);
+mkdirSync(join(stableManifestPath, '..'), { recursive: true });
+writeFileSync(stableManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+console.log(`Prepared signed OBS artifacts and bridge for ${version}.`);

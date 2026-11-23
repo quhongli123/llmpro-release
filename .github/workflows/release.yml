@@ -2,26 +2,21 @@ name: release
 
 # 这个 workflow 属于【公开发布仓 llmpro-release】。
 # 它在构建时临时拉取【私有源码仓 llmpro】的代码（源码不会进入本仓库），
-# 编译签名 macOS/Windows 安装包，上传到 Huawei Cloud OBS，并同步一个 GitHub
+# 编译签名 macOS 和 Windows 安装包，上传到 Huawei Cloud OBS，并同步一个 GitHub
 # bridge latest.json，兼容已经安装的旧版本。
 #
 # 手动发版：Actions -> release -> Run workflow，填写：
-#   source_ref  = 私有源码仓要构建的分支或 tag（默认 main）
+#   source_ref  = 私有源码仓的发布 tag，与 release_tag 一致
 #   release_tag = 发布版本号，如 v0.2.0（需与源码里 tauri.conf.json 的 version 一致）
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: '私有源码仓的分支/tag'
+        description: '私有源码仓的发布 tag，与 release_tag 一致'
         required: true
-        default: 'main'
       release_tag:
         description: '发布版本 tag，如 v0.2.0'
         required: true
-      platforms:
-        description: '构建平台：macos,windows,linux 的逗号分隔组合'
-        required: true
-        default: 'macos,windows'
 
 permissions:
   contents: write
@@ -43,29 +38,24 @@ jobs:
     steps:
       - id: resolve
         env:
-          PLATFORMS: ${{ inputs.platforms }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           node <<'NODE' >> "$GITHUB_OUTPUT"
-          const requested = (process.env.PLATFORMS || '')
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean);
-          const supported = {
-            macos: { name: 'macos', platform: 'macos-latest', args: '--bundles app,dmg' },
-            windows: { name: 'windows', platform: 'windows-latest', args: '--bundles nsis,msi' },
-            linux: { name: 'linux', platform: 'ubuntu-22.04', args: '--bundles appimage,deb' },
-          };
-          const invalid = requested.filter((name) => !supported[name]);
-          if (!requested.length || invalid.length) {
-            console.error(`Invalid platforms: ${invalid.join(', ') || '(empty)'}`);
-            process.exit(1);
+          const { RELEASE_TAG: tag, SOURCE_REF: ref } = process.env;
+          if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag) || tag !== ref) {
+            throw new Error('source_ref must be the same stable version tag as release_tag');
           }
-          const include = [...new Set(requested)].map((name) => supported[name]);
+          const include = [
+            { name: 'macos', platform: 'macos-15', args: '--target aarch64-apple-darwin --bundles app,dmg' },
+            { name: 'windows', platform: 'windows-2022', args: '--target x86_64-pc-windows-msvc --bundles nsis,msi' },
+          ];
           process.stdout.write(`matrix=${JSON.stringify({ include })}\n`);
           NODE
 
   verify-obs-config:
     name: Verify OBS release configuration
+    needs: resolve-platforms
     runs-on: ubuntu-latest
     steps:
       - name: Check OBS variables and secrets
@@ -75,6 +65,7 @@ jobs:
           OBS_BUCKET: ${{ vars.OBS_BUCKET }}
           OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
           OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           missing=0
@@ -93,6 +84,18 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+          stable_url="${OBS_PUBLIC_BASE_URL%/}/llmpro/latest.json"
+          curl -fsSL --retry 3 --max-time 30 "$stable_url" -o "$RUNNER_TEMP/current-llmpro.json"
+          export LLMPRO_CURRENT_MANIFEST="$RUNNER_TEMP/current-llmpro.json"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const current = JSON.parse(fs.readFileSync(process.env.LLMPRO_CURRENT_MANIFEST, 'utf8')).version;
+          const requested = process.env.RELEASE_TAG.slice(1);
+          if (!/^\d+\.\d+\.\d+$/.test(current)) throw new Error('Invalid OBS stable version');
+          const compare = requested.split('.').map((part, index) => Number(part) - Number(current.split('.')[index])).find(Boolean);
+          if (!(compare > 0)) throw new Error(`OBS already serves ${current}. Use a higher version.`);
+          NODE
+
 
   validate:
     name: Validate source (${{ matrix.platform }})
@@ -107,18 +110,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: quhongli123/llmpro
-          ref: ${{ github.event.inputs.source_ref }}
+          ref: refs/tags/${{ inputs.source_ref }}
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           path: source
-
-      - name: Install Linux system deps (WebKitGTK etc.)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential curl wget file patchelf libssl-dev \
-            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
-            libwebkit2gtk-4.1-dev libsoup-3.0-dev
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -128,37 +123,36 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.21.0
+          node-version: '22'
           cache: pnpm
           cache-dependency-path: source/pnpm-lock.yaml
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust toolchain from source
+        working-directory: source
+        run: rustup show
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './source/src-tauri -> target'
 
+      - name: Verify version and installer identity
+        working-directory: source
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: node scripts/verify-release-version.mjs
+
       - name: Install JS deps
         working-directory: source
         run: pnpm install --frozen-lockfile
-
-      - name: Verify Windows DeepSeek Web install and launch
-        if: matrix.name == 'windows'
-        working-directory: source
-        shell: pwsh
-        env:
-          LLMPRO_DEEPSEEK_RUST_SMOKE: '1'
-        run: pnpm test:deepseek-smoke
 
       - name: Validate source
         working-directory: source
         run: |
           pnpm typecheck
-          pnpm test --run
-          pnpm build
-          cargo test --manifest-path src-tauri/Cargo.toml
+          pnpm test:unit
+          pnpm build:renderer
+          cargo test --locked --lib --manifest-path src-tauri/Cargo.toml llmcenter:: -- --test-threads=1
 
   release:
     needs:
@@ -172,62 +166,31 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      # 拉取私有源码（需要一个能读私有仓的 PAT，存为 secret: SOURCE_REPO_TOKEN）
-      # fetch-depth: 0 —— 生成发布说明需要完整历史与 tag
+      # SOURCE_REPO_TOKEN 由公开发布仓提供，只读访问私有源码。
       - name: Checkout private source
         uses: actions/checkout@v4
         with:
           repository: quhongli123/llmpro
-          ref: ${{ github.event.inputs.source_ref }}
+          ref: refs/tags/${{ inputs.source_ref }}
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           path: source
-          fetch-depth: 0
+          persist-credentials: false
 
-      # 从上一个 tag 到本次 tag 的提交记录生成发布说明，
-      # tauri-action 会把它写进 GitHub Release body 与 latest.json 的 notes。
-      - name: Generate release notes
+      - name: Read release notes
         id: release_notes
         env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          TAG="${RELEASE_TAG#v}"
-          PREV="$(git -C source describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true)"
+          notes="source/docs/releases/$RELEASE_TAG.md"
+          test -s "$notes"
+          end_marker="$(openssl rand -hex 16)"
           {
-            if [ -n "${PREV}" ]; then
-              echo "## 更新内容（${PREV} → v${TAG}）"
-              echo
-              git -C source log --pretty=format:'- %s (%h)' --no-merges "${PREV}..${RELEASE_TAG}" | head -30
-              echo
-              COUNT="$(git -C source rev-list --count --no-merges "${PREV}..${RELEASE_TAG}")"
-              if [ "${COUNT}" -gt 30 ]; then
-                echo "- ……及其余 $((COUNT - 30)) 个提交"
-              fi
-            else
-              echo "## 更新内容（v${TAG}）"
-              echo
-              git -C source log --pretty=format:'- %s (%h)' --no-merges -30
-            fi
+            echo "notes<<$end_marker"
+            cat "$notes"
             echo
-            echo '---'
-            echo '应用内会自动检测并提示更新。'
-          } > /tmp/release-notes.md
-          {
-            echo 'notes<<RELEASE_NOTES_EOF'
-            cat /tmp/release-notes.md
-            echo 'RELEASE_NOTES_EOF'
+            echo "$end_marker"
           } >> "$GITHUB_OUTPUT"
-          echo "---- generated release notes ----"
-          cat /tmp/release-notes.md
-
-      - name: Install Linux system deps (WebKitGTK etc.)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential curl wget file patchelf libssl-dev \
-            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
-            libwebkit2gtk-4.1-dev libsoup-3.0-dev
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -237,56 +200,31 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
           cache: pnpm
           cache-dependency-path: source/pnpm-lock.yaml
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust toolchain from source
+        working-directory: source
+        run: rustup show
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './source/src-tauri -> target'
 
+      - name: Verify version and installer identity
+        working-directory: source
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: node scripts/verify-release-version.mjs
+
       - name: Install JS deps
         working-directory: source
         run: pnpm install --frozen-lockfile
 
-      # 从 release_tag 自动生成版本覆盖（无需改源码里的 tauri.conf.json）
-      - name: Prepare version override from tag
-        working-directory: source
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
-          OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const tag = process.env.RELEASE_TAG || '';
-          const version = tag.replace(/^v/, '');
-          const base = (process.env.OBS_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
-          if (!/^\d+\.\d+\.\d+$/.test(version)) {
-            console.error(`invalid release tag: ${tag}`);
-            process.exit(1);
-          }
-          if (!base) {
-            console.error('OBS_PUBLIC_BASE_URL is required');
-            process.exit(1);
-          }
-          const config = {
-            version,
-            plugins: {
-              updater: {
-                endpoints: [`${base}/llmpro/latest.json`],
-              },
-            },
-          };
-          fs.writeFileSync('version-override.json', `${JSON.stringify(config)}\n`);
-          console.log(`version and updater endpoint override -> ${version}, ${base}/llmpro/latest.json`);
-          NODE
-
       - name: Verify macOS signing and notarization secrets
-        if: matrix.platform == 'macos-latest'
+        if: matrix.name == 'macos'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -315,7 +253,7 @@ jobs:
           fi
 
       - name: Store Apple notary credentials
-        if: matrix.platform == 'macos-latest'
+        if: matrix.name == 'macos'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_PASSWORD }}
@@ -329,33 +267,34 @@ jobs:
           echo "APPLE_NOTARY_PROFILE=llmpro-notary" >> "$GITHUB_ENV"
 
       # tauri-action 在“本仓库”(公开仓)创建 Release，latest.json 里的下载地址即公开仓地址
-      - name: Build & publish signed release
+      - name: Build and upload signed release draft
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLMPRO_FEEDBACK_BITABLE_URL: ${{ vars.LLMPRO_FEEDBACK_BITABLE_URL }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_CERTIFICATE: ${{ matrix.name == 'macos' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.name == 'macos' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.name == 'macos' && secrets.APPLE_SIGNING_IDENTITY || '' }}
           # Notarize the app before Tauri creates the DMG and updater archive.
-          APPLE_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && (secrets.APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_PASSWORD) || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_ID: ${{ matrix.name == 'macos' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.name == 'macos' && (secrets.APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_PASSWORD) || '' }}
+          APPLE_TEAM_ID: ${{ matrix.name == 'macos' && secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: source
-          tagName: ${{ github.event.inputs.release_tag }}
-          releaseName: 'llmpro ${{ github.event.inputs.release_tag }}'
+          tagName: ${{ inputs.release_tag }}
+          releaseName: 'llmpro ${{ inputs.release_tag }}'
           releaseBody: ${{ steps.release_notes.outputs.notes }}
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }} --config ${{ github.workspace }}/source/version-override.json
+          args: ${{ matrix.args }} -- --locked
 
       - name: Notarize and staple macOS app and DMG
-        if: matrix.platform == 'macos-latest'
+        if: matrix.name == 'macos'
         env:
           APPLE_NOTARY_PROFILE: ${{ env.APPLE_NOTARY_PROFILE }}
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -372,9 +311,9 @@ jobs:
           xcrun stapler staple "$dmg"
 
       - name: Verify macOS Gatekeeper and notarization
-        if: matrix.platform == 'macos-latest'
+        if: matrix.name == 'macos'
         env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -382,6 +321,7 @@ jobs:
           dmg="$(find source/src-tauri/target -type f -name "llmpro_${version}_aarch64.dmg" -print -quit)"
           test -n "$app" && test -n "$dmg"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "cn.modelbest.llmpro"
           test "$("$app/Contents/MacOS/llmpro" --version)" = "llmpro $version"
           codesign --verify --deep --strict --verbose=2 "$app"
           spctl --assess --type execute --verbose=2 "$app"
@@ -410,11 +350,30 @@ jobs:
           hdiutil detach "$mount" -quiet
           trap - EXIT
 
+      - name: Verify Windows installers
+        if: matrix.name == 'windows'
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.Substring(1)
+          $build = 'source/src-tauri/target/x86_64-pc-windows-msvc/release'
+          $exe = Get-Item -LiteralPath "$build/llmpro.exe" -ErrorAction Stop
+          $info = $exe.VersionInfo
+          if ("$($info.ProductMajorPart).$($info.ProductMinorPart).$($info.ProductBuildPart)" -ne $version) {
+            throw "Windows binary version does not match the release tag"
+          }
+          foreach ($asset in @("nsis/llmpro_${version}_x64-setup.exe", "msi/llmpro_${version}_x64_en-US.msi")) {
+            if ((Get-Item -LiteralPath "$build/bundle/$asset" -ErrorAction Stop).Length -eq 0) {
+              throw "Empty Windows installer: $asset"
+            }
+          }
+
       - name: Replace GitHub Release DMG with stapled artifact
-        if: matrix.platform == 'macos-latest'
+        if: matrix.name == 'macos'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -426,6 +385,7 @@ jobs:
             --clobber
 
   publish-obs:
+    if: github.repository == 'quhongli123/llmpro-release' && github.ref == 'refs/heads/main'
     name: Publish OBS artifacts and bridge manifest
     needs: release
     runs-on: ubuntu-latest
@@ -437,7 +397,7 @@ jobs:
       - name: Download all generated release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           mkdir -p .release-assets
@@ -448,12 +408,27 @@ jobs:
 
       - name: Prepare OBS manifest and upload directory
         env:
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
           RELEASE_ASSET_DIR: .release-assets
           OBS_UPLOAD_DIR: .obs-upload
           OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
           STABLE_MANIFEST_PATH: updater/latest.json
         run: node scripts/publish-obs-manifest.mjs
+
+      - name: Verify updater signatures with the installed clients' public key
+        env:
+          LLMPRO_MINISIGN_PUBKEY: RWSipQpmnZGmex/yNP6DOUrAa5D212WxeER0LcSr3d7LqDUGdnAkRe+C
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends minisign
+          jq -e -r '.platforms[].url | split("/") | last' .obs-upload/latest.json \
+            | sort -u > "$RUNNER_TEMP/llmpro-updater-assets"
+          while IFS= read -r name; do
+            base64 --decode ".obs-upload/$name.sig" > "$RUNNER_TEMP/llmpro-updater.sig"
+            minisign -Vm ".obs-upload/$name" -x "$RUNNER_TEMP/llmpro-updater.sig" \
+              -P "$LLMPRO_MINISIGN_PUBKEY"
+          done < "$RUNNER_TEMP/llmpro-updater-assets"
 
       - name: Install obsutil
         run: |
@@ -470,13 +445,14 @@ jobs:
           chmod 755 "$OBSUTIL"
           echo "OBSUTIL=$OBSUTIL" >> "$GITHUB_ENV"
 
-      - name: Upload versioned assets to OBS
+      - name: Upload and verify versioned OBS assets
         env:
+          OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
           OBS_ACCESS_KEY: ${{ secrets.OBS_ACCESS_KEY }}
           OBS_SECRET_KEY: ${{ secrets.OBS_SECRET_KEY }}
           OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
           OBS_BUCKET: ${{ vars.OBS_BUCKET }}
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -516,6 +492,17 @@ jobs:
             exit 1
           fi
 
+          public_dir="${OBS_PUBLIC_BASE_URL%/}/llmpro/$version"
+          for name in "${upload_names[@]}"; do
+            file="$GITHUB_WORKSPACE/.obs-upload/$name"
+            expected="$(sha256sum "$file" | cut -d' ' -f1)"
+            actual="$(curl -fsSL --retry 3 --max-time 120 "$public_dir/$name" | sha256sum | cut -d' ' -f1)"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error title=OBS asset checksum mismatch::$name"
+              exit 1
+            fi
+          done
+
           "$OBSUTIL" cp "$GITHUB_WORKSPACE/.obs-upload/latest.json" \
             "obs://$OBS_BUCKET/llmpro/latest.json" \
             -f \
@@ -525,7 +512,7 @@ jobs:
       - name: Replace GitHub bridge manifest with OBS URLs
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           gh release upload "$RELEASE_TAG" \
@@ -534,6 +521,8 @@ jobs:
             --clobber
 
       - name: Commit bridge manifest
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           if git diff --quiet -- updater/latest.json; then
@@ -544,5 +533,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add updater/latest.json
-          git commit -m "chore(updater): bridge ${{ github.event.inputs.release_tag }} to OBS"
+          git commit -m "chore(updater): bridge $RELEASE_TAG to OBS"
           git push
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
