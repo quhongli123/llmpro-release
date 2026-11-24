@@ -14,20 +14,24 @@ llmpro 桌面客户端 —— 一键把 Claude Code / Codex 指向 llm-center �
 
 ## 发布流程
 
-正常发版使用 `release.yml`。它复用私有源码仓 `llmpro-build.yml` 已成功生成的 macOS/Windows 候选包，只执行签名、公证、updater 清单和 OBS 发布，不再重复编译 Rust。
+正常发版分两步：
+
+1. 在 `prepare-release.yml` 填写源码分支、tag 或 commit，预先编译未签名候选包；
+2. 候选包就绪后运行 `release.yml`，复用 artifact 完成签名、公证、updater 清单和 OBS 发布。
+
+`prepare-release.yml` 在公开仓执行，避免私有源码仓 Actions 配额影响；它并行生成两个 artifact：
+
+- `llmpro-candidate-<source-sha>-macos`
+- `llmpro-candidate-<source-sha>-windows`
 
 发布阶段的时间边界：
 
 - 候选包已就绪时，macOS/Windows 并行封装在 5 分钟内完成；
 - Apple 公证排队时间和 GitHub/OBS 上传时间取决于实际服务与带宽；
-- 从源码冷编译仍使用 `release-full.yml`，该路径通常需要数十分钟。
+- `release.yml` 也会兼容私有源码仓旧 `llmpro-build.yml` 的成功候选包；
+- 没有候选包时使用 `release-full.yml` 从源码冷编译，该路径通常需要数十分钟。
 
-`release.yml` 要求同一个源码 commit 存在成功的 `llmpro-build.yml` run，并包含两个 artifact：
-
-- `llmpro-macOS-aarch64-apple-darwin`
-- `llmpro-Windows-x86_64-pc-windows-msvc`
-
-可手动填写 `candidate_run_id` 锁定候选构建。仅修复单个平台时，将 `platform` 设为 `macos` 或 `windows`；正常发版保持 `all`。
+可手动填写 `candidate_run_id` 锁定某个 `prepare-release.yml` run。仅修复单个平台时，将 `platform` 设为 `macos` 或 `windows`；正常发版保持 `all`。
 
 ## macOS 发布要求
 

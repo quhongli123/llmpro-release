@@ -35,6 +35,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 defaults:
   run:
@@ -54,6 +55,7 @@ jobs:
       candidate_run_id: ${{ steps.candidate.outputs.run_id }}
       mac_artifact_id: ${{ steps.candidate.outputs.mac_artifact_id }}
       windows_artifact_id: ${{ steps.candidate.outputs.windows_artifact_id }}
+      candidate_repository: ${{ steps.candidate.outputs.repository }}
       platform: ${{ steps.validate.outputs.platform }}
 
     steps:
@@ -99,48 +101,101 @@ jobs:
           echo "source_sha=$sha" >> "$GITHUB_OUTPUT"
           echo "source_sha=$sha" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Find successful candidate build
+      - name: Find candidate artifacts
         id: candidate
         env:
-          GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
           SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
         run: |
           set -euo pipefail
-          run_id="$CANDIDATE_RUN_ID"
-          if [[ -z "$run_id" ]]; then
-            run_id="$(gh api \
-              "repos/quhongli123/llmpro/actions/workflows/llmpro-build.yml/runs?head_sha=$SOURCE_SHA&status=success&per_page=20" \
-              --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id // empty')"
+          mac_name="llmpro-candidate-${SOURCE_SHA}-macos"
+          windows_name="llmpro-candidate-${SOURCE_SHA}-windows"
+          repository=""
+          run_id=""
+
+          if [[ -n "$CANDIDATE_RUN_ID" ]]; then
+            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID")"
+            run_conclusion="$(jq -r '.conclusion // empty' <<<"$run_json")"
+            if [[ "$run_conclusion" != "success" ]]; then
+              echo "::error title=Candidate run mismatch::Run $CANDIDATE_RUN_ID conclusion=$run_conclusion"
+              exit 1
+            fi
+            artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID/artifacts?per_page=100")"
+            repository="$GITHUB_REPOSITORY"
+            run_id="$CANDIDATE_RUN_ID"
+          else
+            artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
+            mac_artifact_id="$(jq -r --arg name "$mac_name" '
+              .artifacts
+              | map(select(.expired == false and .name == $name))
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id // empty
+            ' <<<"$artifacts_json")"
+            windows_artifact_id="$(jq -r --arg name "$windows_name" '
+              .artifacts
+              | map(select(.expired == false and .name == $name))
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id // empty
+            ' <<<"$artifacts_json")"
+            if [[ -n "$mac_artifact_id" && -n "$windows_artifact_id" ]]; then
+              repository="$GITHUB_REPOSITORY"
+              run_id="$(jq -r --arg name "$mac_name" '
+                .artifacts[] | select(.name == $name) | .workflow_run.id // empty
+              ' <<<"$artifacts_json" | head -1)"
+            fi
           fi
-          if [[ -z "$run_id" ]]; then
-            echo "::error title=Candidate build missing::No successful llmpro-build.yml run exists for $SOURCE_SHA. Wait for the candidate build, provide candidate_run_id, or run release-full.yml."
+
+          # 兼容以前由私有源码仓 llmpro-build.yml 生成的候选包。
+          if [[ -z "$repository" ]]; then
+            export GH_TOKEN="$SOURCE_REPO_TOKEN"
+            if [[ -z "$CANDIDATE_RUN_ID" ]]; then
+              CANDIDATE_RUN_ID="$(gh api                 "repos/quhongli123/llmpro/actions/workflows/llmpro-build.yml/runs?head_sha=$SOURCE_SHA&status=success&per_page=20"                 --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id // empty')"
+            fi
+            if [[ -n "$CANDIDATE_RUN_ID" ]]; then
+              run_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$CANDIDATE_RUN_ID")"
+              run_conclusion="$(jq -r '.conclusion // empty' <<<"$run_json")"
+              run_sha="$(jq -r '.head_sha // empty' <<<"$run_json")"
+              if [[ "$run_conclusion" == "success" && "$run_sha" == "$SOURCE_SHA" ]]; then
+                artifacts_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$CANDIDATE_RUN_ID/artifacts?per_page=100")"
+                repository="quhongli123/llmpro"
+                run_id="$CANDIDATE_RUN_ID"
+              fi
+            fi
+          fi
+
+          if [[ -z "$repository" ]]; then
+            echo "::error title=Candidate build missing::No public prepare-release artifact or private llmpro-build.yml run exists for $SOURCE_SHA. Run prepare-release.yml first, provide candidate_run_id, or use release-full.yml."
             exit 1
           fi
 
-          run_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$run_id")"
-          run_conclusion="$(jq -r '.conclusion // empty' <<<"$run_json")"
-          run_sha="$(jq -r '.head_sha // empty' <<<"$run_json")"
-          if [[ "$run_conclusion" != "success" || "$run_sha" != "$SOURCE_SHA" ]]; then
-            echo "::error title=Candidate run mismatch::Run $run_id conclusion=$run_conclusion sha=$run_sha, expected success and $SOURCE_SHA"
-            exit 1
-          fi
-
-          artifacts_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$run_id/artifacts?per_page=100")"
-          mac_artifact_id="$(jq -r '.artifacts[] | select(.expired == false and .name == "llmpro-macOS-aarch64-apple-darwin") | .id' <<<"$artifacts_json" | head -1)"
-          windows_artifact_id="$(jq -r '.artifacts[] | select(.expired == false and .name == "llmpro-Windows-x86_64-pc-windows-msvc") | .id' <<<"$artifacts_json" | head -1)"
-
+          mac_artifact_id="$(jq -r --arg name "$mac_name" '
+            .artifacts | map(select(.expired == false and .name == $name)) | .[0].id // empty
+          ' <<<"$artifacts_json")"
+          windows_artifact_id="$(jq -r --arg name "$windows_name" '
+            .artifacts | map(select(.expired == false and .name == $name)) | .[0].id // empty
+          ' <<<"$artifacts_json")"
           if [[ -z "$mac_artifact_id" || -z "$windows_artifact_id" ]]; then
-            echo "::error title=Candidate artifacts missing::Run $run_id must contain both macOS and Windows artifacts"
+            # 私有源码仓使用旧 artifact 名称。
+            mac_artifact_id="$(jq -r '.artifacts[] | select(.expired == false and .name == "llmpro-macOS-aarch64-apple-darwin") | .id' <<<"$artifacts_json" | head -1)"
+            windows_artifact_id="$(jq -r '.artifacts[] | select(.expired == false and .name == "llmpro-Windows-x86_64-pc-windows-msvc") | .id' <<<"$artifacts_json" | head -1)"
+          fi
+          if [[ -z "$mac_artifact_id" || -z "$windows_artifact_id" ]]; then
+            echo "::error title=Candidate artifacts missing::Repository $repository must contain both macOS and Windows candidates for $SOURCE_SHA"
             exit 1
           fi
 
           {
+            echo "repository=$repository"
             echo "run_id=$run_id"
             echo "mac_artifact_id=$mac_artifact_id"
             echo "windows_artifact_id=$windows_artifact_id"
           } >> "$GITHUB_OUTPUT"
           {
+            echo "candidate_repository=$repository"
             echo "candidate_run=$run_id"
             echo "mac_artifact=$mac_artifact_id"
             echo "windows_artifact=$windows_artifact_id"
@@ -219,12 +274,13 @@ jobs:
 
       - name: Download prebuilt macOS candidate
         env:
-          GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+          GH_TOKEN: ${{ needs.prepare.outputs.candidate_repository == github.repository && github.token || secrets.SOURCE_REPO_TOKEN }}
+          CANDIDATE_REPOSITORY: ${{ needs.prepare.outputs.candidate_repository }}
           ARTIFACT_ID: ${{ needs.prepare.outputs.mac_artifact_id }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/macos-candidate"
-          gh api "repos/quhongli123/llmpro/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/macos-candidate.zip"
+          gh api "repos/$CANDIDATE_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/macos-candidate.zip"
           unzip -q "$RUNNER_TEMP/macos-candidate.zip" -d "$RUNNER_TEMP/macos-candidate"
 
       - name: Sign, notarize, staple, and package
@@ -344,12 +400,13 @@ jobs:
 
       - name: Download prebuilt Windows candidate
         env:
-          GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+          GH_TOKEN: ${{ needs.prepare.outputs.candidate_repository == github.repository && github.token || secrets.SOURCE_REPO_TOKEN }}
+          CANDIDATE_REPOSITORY: ${{ needs.prepare.outputs.candidate_repository }}
           ARTIFACT_ID: ${{ needs.prepare.outputs.windows_artifact_id }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/windows-candidate"
-          gh api "repos/quhongli123/llmpro/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/windows-candidate.zip"
+          gh api "repos/$CANDIDATE_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$RUNNER_TEMP/windows-candidate.zip"
           unzip -q "$RUNNER_TEMP/windows-candidate.zip" -d "$RUNNER_TEMP/windows-candidate"
 
       - name: Sign installers and upload

@@ -1,0 +1,106 @@
+name: prepare-release
+
+# 在公开仓预先编译未签名候选包，避免私有源码仓 Actions 配额影响发版。
+# 正常流程：先运行本 workflow；候选 artifact 就绪后运行 release.yml。
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: '私有源码仓的分支、tag 或 commit'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llmpro-prepare-${{ inputs.source_ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }} candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            runner: macos-15
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - name: windows
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: quhongli123/llmpro
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: source
+          persist-credentials: false
+
+      - name: Resolve source commit
+        id: source
+        shell: bash
+        run: echo "sha=$(git -C source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+
+      - name: Setup Rust toolchain from source
+        working-directory: source
+        run: rustup show
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './source/src-tauri -> target'
+          shared-key: llmpro-candidate-${{ matrix.name }}
+          cache-on-failure: true
+
+      - name: Install JS dependencies
+        working-directory: source
+        run: pnpm install --frozen-lockfile
+
+      - name: Build unsigned candidate
+        working-directory: source
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          BUNDLES: ${{ matrix.bundles }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' '{"bundle":{"createUpdaterArtifacts":false}}' > "$RUNNER_TEMP/llmpro-build.json"
+          pnpm tauri build \
+            --config "$RUNNER_TEMP/llmpro-build.json" \
+            --target "$TARGET" \
+            --bundles "$BUNDLES" \
+            --no-sign \
+            --ci \
+            -- --locked
+
+      - name: Upload candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llmpro-candidate-${{ steps.source.outputs.sha }}-${{ matrix.name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            source/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            source/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe
+            source/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
