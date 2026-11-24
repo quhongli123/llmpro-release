@@ -29,7 +29,7 @@ on:
           - macos
           - windows
       candidate_run_id:
-        description: '可选：llmpro-build.yml 的成功 run id；留空自动查找'
+        description: '可选：prepare-release.yml 的成功 run id（兼容旧 llmpro-build.yml）；留空自动查找'
         required: false
         type: string
 
@@ -116,15 +116,28 @@ jobs:
           run_id=""
 
           if [[ -n "$CANDIDATE_RUN_ID" ]]; then
-            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID")"
-            run_conclusion="$(jq -r '.conclusion // empty' <<<"$run_json")"
-            if [[ "$run_conclusion" != "success" ]]; then
-              echo "::error title=Candidate run mismatch::Run $CANDIDATE_RUN_ID conclusion=$run_conclusion"
-              exit 1
+            if run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" 2>/dev/null)"; then
+              run_conclusion="$(jq -r '.conclusion // empty' <<<"$run_json")"
+              if [[ "$run_conclusion" != "success" ]]; then
+                echo "::error title=Candidate run mismatch::Run $CANDIDATE_RUN_ID conclusion=$run_conclusion"
+                exit 1
+              fi
+              artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID/artifacts?per_page=100")"
+              repository="$GITHUB_REPOSITORY"
+              run_id="$CANDIDATE_RUN_ID"
+            else
+              export GH_TOKEN="$SOURCE_REPO_TOKEN"
+              run_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$CANDIDATE_RUN_ID")"
+              run_conclusion="$(jq -r '.conclusion // empty' <<<"$run_json")"
+              run_sha="$(jq -r '.head_sha // empty' <<<"$run_json")"
+              if [[ "$run_conclusion" != "success" || "$run_sha" != "$SOURCE_SHA" ]]; then
+                echo "::error title=Candidate run mismatch::Run $CANDIDATE_RUN_ID conclusion=$run_conclusion sha=$run_sha, expected success and $SOURCE_SHA"
+                exit 1
+              fi
+              artifacts_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$CANDIDATE_RUN_ID/artifacts?per_page=100")"
+              repository="quhongli123/llmpro"
+              run_id="$CANDIDATE_RUN_ID"
             fi
-            artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID/artifacts?per_page=100")"
-            repository="$GITHUB_REPOSITORY"
-            run_id="$CANDIDATE_RUN_ID"
           else
             artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100")"
             mac_artifact_id="$(jq -r --arg name "$mac_name" '
@@ -153,7 +166,7 @@ jobs:
           if [[ -z "$repository" ]]; then
             export GH_TOKEN="$SOURCE_REPO_TOKEN"
             if [[ -z "$CANDIDATE_RUN_ID" ]]; then
-              CANDIDATE_RUN_ID="$(gh api                 "repos/quhongli123/llmpro/actions/workflows/llmpro-build.yml/runs?head_sha=$SOURCE_SHA&status=success&per_page=20"                 --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id // empty')"
+              CANDIDATE_RUN_ID="$(gh api "repos/quhongli123/llmpro/actions/workflows/llmpro-build.yml/runs?head_sha=$SOURCE_SHA&status=success&per_page=20" --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id // empty')"
             fi
             if [[ -n "$CANDIDATE_RUN_ID" ]]; then
               run_json="$(gh api "repos/quhongli123/llmpro/actions/runs/$CANDIDATE_RUN_ID")"
