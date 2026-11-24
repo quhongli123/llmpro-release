@@ -275,7 +275,7 @@ jobs:
     name: Sign and notarize macOS
     needs: prepare
     if: needs.prepare.outputs.platform == 'all' || needs.prepare.outputs.platform == 'macos'
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 8
 
     steps:
