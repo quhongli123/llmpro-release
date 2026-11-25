@@ -49,8 +49,8 @@ for _ in {1..20}; do
     --workflow prepare-release.yml \
     --limit 20 \
     --json databaseId,createdAt,displayTitle \
-    --jq --arg tag "$tag" '
-      map(select(.displayTitle | contains($tag)))
+    --jq --arg since "$dispatch_time" --arg tag "$tag" '
+      map(select(.createdAt >= $since and (.displayTitle | contains($tag))))
       | sort_by(.createdAt)
       | reverse
       | .[0].databaseId // empty
