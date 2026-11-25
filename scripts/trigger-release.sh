@@ -48,8 +48,8 @@ for _ in {1..20}; do
     --repo "$repo" \
     --workflow prepare-release.yml \
     --limit 20 \
-    --json databaseId,createdAt,displayTitle \
-    --jq --arg since "$dispatch_time" --arg tag "$tag" '
+    --json databaseId,createdAt,displayTitle | \
+    jq -r --arg since "$dispatch_time" --arg tag "$tag" '
       map(select(.createdAt >= $since and (.displayTitle | contains($tag))))
       | sort_by(.createdAt)
       | reverse
@@ -72,8 +72,8 @@ for _ in {1..30}; do
     --workflow release.yml \
     --event workflow_run \
     --limit 30 \
-    --json databaseId,createdAt,displayTitle \
-    --jq --arg since "$dispatch_time" --arg tag "$tag" '
+    --json databaseId,createdAt,displayTitle | \
+    jq -r --arg since "$dispatch_time" --arg tag "$tag" '
       map(select(.createdAt >= $since and (.displayTitle | contains($tag))))
       | sort_by(.createdAt)
       | reverse
