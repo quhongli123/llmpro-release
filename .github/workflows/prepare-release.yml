@@ -94,7 +94,6 @@ jobs:
             APPLE_ID \
             APPLE_TEAM_ID \
             TAURI_SIGNING_PRIVATE_KEY \
-            TAURI_SIGNING_PRIVATE_KEY_PASSWORD \
             OBS_ACCESS_KEY \
             OBS_SECRET_KEY \
             OBS_BUCKET \
