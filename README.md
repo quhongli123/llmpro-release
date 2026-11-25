@@ -6,13 +6,15 @@ llmpro 桌面客户端 —— 一键把 Claude Code / Codex 指向 llm-center �
 
 安装包和自动更新文件发布到 OBS；GitHub Release 只保留兼容旧版本的桥接清单。
 
-| 平台 | 文件 |
-|------|------|
-| macOS (Apple Silicon) | `llmpro_x.y.z_aarch64.dmg` |
-| Windows | `llmpro_x.y.z_x64-setup.exe` |
-| Linux | `llmpro_x.y.z_amd64.AppImage` / `.deb` |
+| 平台                  | 文件                         |
+| --------------------- | ---------------------------- |
+| macOS (Apple Silicon) | `llmpro_x.y.z_aarch64.dmg`   |
+| Windows               | `llmpro_x.y.z_x64-setup.exe` |
+| Linux                 | 当前正式发布流水线未产出     |
 
 ## 发布流程
+
+AI 和自动化执行的完整规范见 [docs/RELEASE_RUNBOOK.md](docs/RELEASE_RUNBOOK.md)。
 
 正常发版只需启动 `prepare-release.yml`，候选包构建成功后 `release.yml` 会通过 `workflow_run` 自动接力，不需要再手动触发第二次。
 
