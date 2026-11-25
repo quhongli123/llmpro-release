@@ -1,4 +1,5 @@
 name: release
+run-name: release ${{ github.event.workflow_run.display_title || inputs.release_tag }}
 
 # 快速发布路径：复用私有源码仓已经成功构建的候选包，只做签名、公证、
 # updater 清单和 OBS 发布。这样发布阶段不再重复编译整个 Tauri 应用。
@@ -33,6 +34,12 @@ on:
         required: false
         type: string
 
+  workflow_run:
+    workflows:
+      - prepare-release
+    types:
+      - completed
+
 permissions:
   contents: write
   actions: read
@@ -46,11 +53,107 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    name: Prepare fast release
+  resolve:
+    name: Resolve release request
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 4
     outputs:
+      source_ref: ${{ steps.resolve.outputs.source_ref }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      platform: ${{ steps.resolve.outputs.platform }}
+      candidate_run_id: ${{ steps.resolve.outputs.candidate_run_id }}
+      publish: ${{ steps.resolve.outputs.publish }}
+
+    steps:
+      - name: Resolve manual or automatic release inputs
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_SOURCE_REF: ${{ inputs.source_ref }}
+          MANUAL_RELEASE_TAG: ${{ inputs.release_tag }}
+          MANUAL_PLATFORM: ${{ inputs.platform }}
+          MANUAL_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          PREPARE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            source_ref=""
+            release_tag=""
+            platform="all"
+            candidate_run_id="$PREPARE_RUN_ID"
+            publish="true"
+
+            artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREPARE_RUN_ID/artifacts?per_page=100")"
+            meta_artifact_id="$(jq -r '
+              .artifacts
+              | map(select(.expired == false and (.name | startswith("llmpro-release-meta-"))))
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id // empty
+            ' <<<"$artifacts_json")"
+            if [[ -z "$meta_artifact_id" ]]; then
+              echo "::error title=Release metadata missing::prepare-release did not upload its release metadata"
+              exit 1
+            fi
+
+            mkdir -p "$RUNNER_TEMP/release-meta"
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$meta_artifact_id/zip" \
+              > "$RUNNER_TEMP/release-meta.zip"
+            unzip -q "$RUNNER_TEMP/release-meta.zip" -d "$RUNNER_TEMP/release-meta"
+            meta="$RUNNER_TEMP/release-meta/release-meta.json"
+            test -s "$meta"
+
+            source_ref="$(jq -r '.source_ref // empty' "$meta")"
+            release_tag="$(jq -r '.release_tag // empty' "$meta")"
+            publish="$(jq -r '.auto_publish == true' "$meta")"
+          else
+            source_ref="$MANUAL_SOURCE_REF"
+            release_tag="$MANUAL_RELEASE_TAG"
+            platform="${MANUAL_PLATFORM:-all}"
+            candidate_run_id="$MANUAL_CANDIDATE_RUN_ID"
+            publish="true"
+          fi
+
+          if [[ ! "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error title=Invalid release tag::Expected a stable tag such as v0.2.164"
+            exit 1
+          fi
+          if [[ "$source_ref" != "$release_tag" ]]; then
+            echo "::error title=Tag mismatch::source_ref and release_tag must be identical"
+            exit 1
+          fi
+          case "$platform" in
+            all|macos|windows) ;;
+            *) echo "::error title=Invalid platform::$platform"; exit 1 ;;
+          esac
+
+          {
+            echo "source_ref=$source_ref"
+            echo "release_tag=$release_tag"
+            echo "platform=$platform"
+            echo "candidate_run_id=$candidate_run_id"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release request"
+            echo "- source: \`$source_ref\`"
+            echo "- platform: \`$platform\`"
+            echo "- candidate run: \`${candidate_run_id:-auto}\`"
+            echo "- request: \`$EVENT_NAME\`"
+            echo "- publish: \`$publish\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  prepare:
+    name: Prepare fast release
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    outputs:
+      release_tag: ${{ steps.validate.outputs.release_tag }}
       source_sha: ${{ steps.source.outputs.source_sha }}
       candidate_run_id: ${{ steps.candidate.outputs.run_id }}
       mac_artifact_id: ${{ steps.candidate.outputs.mac_artifact_id }}
@@ -62,9 +165,9 @@ jobs:
       - name: Validate inputs
         id: validate
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          SOURCE_REF: ${{ inputs.source_ref }}
-          PLATFORM: ${{ inputs.platform }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+          SOURCE_REF: ${{ needs.resolve.outputs.source_ref }}
+          PLATFORM: ${{ needs.resolve.outputs.platform }}
         run: |
           set -euo pipefail
           if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
@@ -79,13 +182,14 @@ jobs:
             all|macos|windows) ;;
             *) echo "::error title=Invalid platform::$PLATFORM"; exit 1 ;;
           esac
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
 
       - name: Resolve source commit
         id: source
         env:
           GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
-          SOURCE_REF: ${{ inputs.source_ref }}
+          SOURCE_REF: ${{ needs.resolve.outputs.source_ref }}
         run: |
           set -euo pipefail
           ref_json="$(gh api "repos/quhongli123/llmpro/git/ref/tags/$SOURCE_REF")"
@@ -107,7 +211,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
           SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
-          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ID: ${{ needs.resolve.outputs.candidate_run_id }}
         run: |
           set -euo pipefail
           mac_name="llmpro-candidate-${SOURCE_SHA}-macos"
@@ -217,7 +321,7 @@ jobs:
       - name: Verify OBS stable version
         env:
           OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
         run: |
           set -euo pipefail
           stable_url="${OBS_PUBLIC_BASE_URL%/}/llmpro/latest.json"
@@ -235,7 +339,7 @@ jobs:
       - name: Read release notes
         env:
           GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
         run: |
           set -euo pipefail
           notes="$RUNNER_TEMP/release-notes.md"
@@ -248,7 +352,7 @@ jobs:
       - name: Create or reuse draft release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
         run: |
           set -euo pipefail
           notes="$RUNNER_TEMP/release-notes.md"
@@ -298,7 +402,7 @@ jobs:
 
       - name: Sign, notarize, staple, and package
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           GH_TOKEN: ${{ github.token }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -424,7 +528,7 @@ jobs:
 
       - name: Sign installers and upload
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           GH_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -469,7 +573,7 @@ jobs:
       - name: Download all generated release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         run: |
           set -euo pipefail
           mkdir -p .release-assets
@@ -481,7 +585,7 @@ jobs:
       - name: Create updater manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           RELEASE_ASSET_DIR: .release-assets
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
         run: |
@@ -491,7 +595,7 @@ jobs:
 
       - name: Prepare OBS manifest and upload directory
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           RELEASE_ASSET_DIR: .release-assets
           OBS_UPLOAD_DIR: .obs-upload
           OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
@@ -532,7 +636,7 @@ jobs:
           OBS_SECRET_KEY: ${{ secrets.OBS_SECRET_KEY }}
           OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
           OBS_BUCKET: ${{ vars.OBS_BUCKET }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -587,7 +691,7 @@ jobs:
       - name: Replace GitHub bridge manifest with OBS URLs
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         run: |
           gh release upload "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
@@ -596,7 +700,7 @@ jobs:
 
       - name: Commit bridge manifest
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         run: |
           set -euo pipefail
           if git diff --quiet -- updater/latest.json; then
@@ -613,5 +717,5 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
         run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

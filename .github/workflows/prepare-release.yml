@@ -1,39 +1,43 @@
 name: prepare-release
+run-name: prepare-release ${{ inputs.source_ref }} (${{ inputs.macos_runner }})
 
 # 在公开仓预先编译未签名候选包，避免私有源码仓 Actions 配额影响发版。
-# 正常流程：先运行本 workflow；候选 artifact 就绪后运行 release.yml。
+# 正常流程只需运行本 workflow；成功后 release.yml 会通过 workflow_run 自动接力。
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: '私有源码仓的分支、tag 或 commit'
+        description: '私有源码仓的发布 tag，例如 v0.2.164'
         required: true
         type: string
+      macos_runner:
+        description: 'macOS runner；默认原生 Apple Silicon，队列异常时可选 Intel 兜底'
+        required: true
+        default: macos-15
+        type: choice
+        options:
+          - macos-15
+          - macos-15-intel
+      publish_after_build:
+        description: '构建成功后自动签名发布；仅测试候选包时取消'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
   group: llmpro-prepare-${{ inputs.source_ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }} candidate
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macos
-            runner: macos-15-intel
-            target: aarch64-apple-darwin
-            bundles: dmg
-          - name: windows
-            runner: windows-2022
-            target: x86_64-pc-windows-msvc
-            bundles: nsis,msi
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+  preflight:
+    name: Preflight release
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
 
     steps:
       - name: Checkout private source
@@ -41,6 +45,126 @@ jobs:
         with:
           repository: quhongli123/llmpro
           ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: source
+          persist-credentials: false
+
+      - name: Resolve source commit
+        id: source
+        shell: bash
+        run: echo "sha=$(git -C source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tagged release
+        working-directory: source
+        env:
+          RELEASE_TAG: ${{ inputs.source_ref }}
+        run: node scripts/verify-release-version.mjs
+
+      - name: Verify release settings before expensive builds
+        env:
+          RELEASE_TAG: ${{ inputs.source_ref }}
+          SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          OBS_ACCESS_KEY: ${{ secrets.OBS_ACCESS_KEY }}
+          OBS_SECRET_KEY: ${{ secrets.OBS_SECRET_KEY }}
+          OBS_BUCKET: ${{ vars.OBS_BUCKET }}
+          OBS_ENDPOINT: ${{ vars.OBS_ENDPOINT }}
+          OBS_PUBLIC_BASE_URL: ${{ vars.OBS_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error title=Invalid release tag::Expected a stable tag such as v0.2.164"
+            exit 1
+          fi
+
+          missing=0
+          for name in \
+            SOURCE_REPO_TOKEN \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_TEAM_ID \
+            TAURI_SIGNING_PRIVATE_KEY \
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD \
+            OBS_ACCESS_KEY \
+            OBS_SECRET_KEY \
+            OBS_BUCKET \
+            OBS_ENDPOINT \
+            OBS_PUBLIC_BASE_URL
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing release setting::$name is required"
+              missing=1
+            fi
+          done
+          if [ -z "${APPLE_APP_SPECIFIC_PASSWORD:-}${APPLE_PASSWORD:-}" ]; then
+            echo "::error title=Missing release setting::APPLE_APP_SPECIFIC_PASSWORD or APPLE_PASSWORD is required"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          test -s "source/docs/releases/$RELEASE_TAG.md"
+
+          stable_url="${OBS_PUBLIC_BASE_URL%/}/llmpro/latest.json"
+          curl -fsSL --retry 3 --max-time 30 "$stable_url" -o "$RUNNER_TEMP/current-llmpro.json"
+          export LLMPRO_CURRENT_MANIFEST="$RUNNER_TEMP/current-llmpro.json"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const current = JSON.parse(fs.readFileSync(process.env.LLMPRO_CURRENT_MANIFEST, 'utf8')).version;
+          const requested = process.env.RELEASE_TAG.slice(1);
+          const parse = (value) => value.split('.').map(Number);
+          const currentParts = parse(current);
+          const requestedParts = parse(requested);
+          const comparison = requestedParts
+            .map((part, index) => part - currentParts[index])
+            .find(Boolean) ?? 0;
+          if (!/^\d+\.\d+\.\d+$/.test(current) || comparison <= 0) {
+            throw new Error(`OBS must be below ${requested}; it currently serves ${current}.`);
+          }
+          NODE
+
+          {
+            echo "### Release preflight passed"
+            echo "- source: \`$RELEASE_TAG\`"
+            echo "- source SHA: \`${{ steps.source.outputs.sha }}\`"
+            echo "- macOS runner: \`${{ inputs.macos_runner }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build ${{ matrix.name }} candidate
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            runner: ${{ inputs.macos_runner }}
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - name: windows
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: quhongli123/llmpro
+          ref: ${{ needs.preflight.outputs.source_sha }}
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           path: source
           persist-credentials: false
@@ -109,3 +233,38 @@ jobs:
             source/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
             source/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe
             source/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+
+  release-meta:
+    name: Publish release metadata
+    needs:
+      - preflight
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Create release metadata
+        env:
+          RELEASE_TAG: ${{ inputs.source_ref }}
+          SOURCE_SHA: ${{ needs.preflight.outputs.source_sha }}
+          AUTO_PUBLISH: ${{ inputs.publish_after_build }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("node:fs");
+            fs.writeFileSync("release-meta.json", JSON.stringify({
+              source_ref: process.env.RELEASE_TAG,
+              release_tag: process.env.RELEASE_TAG,
+              source_sha: process.env.SOURCE_SHA,
+              auto_publish: process.env.AUTO_PUBLISH === "true"
+            }, null, 2));
+          '
+          cat release-meta.json
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: llmpro-release-meta-${{ needs.preflight.outputs.source_sha }}
+          if-no-files-found: error
+          retention-days: 3
+          path: release-meta.json

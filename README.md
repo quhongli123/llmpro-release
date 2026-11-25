@@ -14,24 +14,34 @@ llmpro 桌面客户端 —— 一键把 Claude Code / Codex 指向 llm-center �
 
 ## 发布流程
 
-正常发版分两步：
+正常发版只需启动 `prepare-release.yml`，候选包构建成功后 `release.yml` 会通过 `workflow_run` 自动接力，不需要再手动触发第二次。
 
-1. 在 `prepare-release.yml` 填写源码分支、tag 或 commit，预先编译未签名候选包；
-2. 候选包就绪后运行 `release.yml`，复用 artifact 完成签名、公证、updater 清单和 OBS 发布。
+```bash
+./scripts/trigger-release.sh v0.2.164
+```
 
-`prepare-release.yml` 在公开仓执行，避免私有源码仓 Actions 配额影响；它并行生成两个 artifact：
+脚本会触发候选构建、等待结果、继续等待签名发布并输出 Release 地址。也可以在 Actions 页面手动运行 `prepare-release.yml`；只测试候选包时，将 `publish_after_build` 设为 false。
+
+`prepare-release.yml` 在公开仓执行，避免私有源码仓 Actions 配额影响；它先做 preflight，再并行生成两个 artifact：
 
 - `llmpro-candidate-<source-sha>-macos`
 - `llmpro-candidate-<source-sha>-windows`
 
+preflight 会提前检查源码版本、tag、发布说明、签名/OBS 配置和当前 OBS 版本，配置不全时不会启动 15 分钟以上的编译。
+
+macOS 默认使用 `macos-15` 原生 Apple Silicon runner。遇到 hosted runner 排队异常时，可在手动触发时选择 `macos-15-intel` 兜底；Intel 交叉编译会明显更慢。
+
 发布阶段的时间边界：
 
-- 候选包已就绪时，macOS/Windows 并行封装在 5 分钟内完成；
+- 原生 ARM 候选构建实测约 16 分钟，Intel 交叉编译实测约 30-35 分钟；
+- 候选包已就绪时，签名、公证、清单和 OBS 发布约 3 分钟；
 - Apple 公证排队时间和 GitHub/OBS 上传时间取决于实际服务与带宽；
 - `release.yml` 也会兼容私有源码仓旧 `llmpro-build.yml` 的成功候选包；
 - 没有候选包时使用 `release-full.yml` 从源码冷编译，该路径通常需要数十分钟。
 
 可手动填写 `candidate_run_id` 锁定某个 `prepare-release.yml` run。仅修复单个平台时，将 `platform` 设为 `macos` 或 `windows`；正常发版保持 `all`。
+
+私有源码仓的 tag workflow 仍会消耗私有仓 Actions 配额。若 GitHub 提示付款失败或 spending limit 不足，tag job 不会拿到 runner；这时使用 `scripts/trigger-release.sh` 直接触发公开发布仓。
 
 ## macOS 发布要求
 
